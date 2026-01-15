@@ -76,3 +76,73 @@ export interface UpdateShadowingLessonPayload {
   category?: 'start_here' | 'more_videos';
   metadata?: Record<string, unknown> | null;
 }
+
+// ============================================
+// Shadowing Transcription Job Types
+// ============================================
+
+export type ShadowingTranscriptionJobStatus = 
+  | 'pending' 
+  | 'downloading' 
+  | 'transcribing' 
+  | 'processing' 
+  | 'creating_lesson' 
+  | 'completed' 
+  | 'failed';
+
+export interface ShadowingTranscriptionJob {
+  id: string;
+  youtubeUrl: string;
+  videoId: string | null;
+  status: ShadowingTranscriptionJobStatus;
+  progress: string | null;
+  result: ShadowingTranscriptionResult | null;
+  error: string | null;
+  title: string | null;
+  duration: number | null;
+  shadowingLessonId: number | null;
+  shadowingLesson?: {
+    id: number;
+    title: string;
+    status: 'draft' | 'published';
+    youtubeVideoId: string;
+  } | null;
+  audioFilePath: string | null;
+  transcriptFilePath: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShadowingTranscriptionResult {
+  videoId: string;
+  title: string;
+  duration: number;
+  durationFormatted: string;
+  durationMinutes: string;
+  shadowingLessonId: number;
+  stats: {
+    totalWords: number;
+    segments: number;
+    speakingTimeSeconds: number;
+    wpmBasedOnVideoLength: number;
+    wpmBasedOnSpeakingTime: number;
+  };
+}
+
+export interface ShadowingTranscriptionJobResponse {
+  success: boolean;
+  job: ShadowingTranscriptionJob;
+  message?: string;
+}
+
+export interface ShadowingTranscriptionJobsResponse {
+  success: boolean;
+  jobs: ShadowingTranscriptionJob[];
+  pagination: PaginationInfo;
+}
+
+export interface CreateShadowingTranscriptionPayload {
+  url: string;
+}

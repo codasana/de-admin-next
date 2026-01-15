@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/select"
 import { useAdminShadowingLessons } from '@/hooks/useShadowingAdmin'
 import { EditLessonSheet } from '@/components/shadowing/edit-lesson-sheet'
-import { IconEdit, IconSearch, IconChevronLeft, IconChevronRight, IconX, IconBrandYoutube, IconExternalLink } from "@tabler/icons-react"
+import { AddLessonSheet } from '@/components/shadowing/add-lesson-sheet'
+import { IconEdit, IconSearch, IconChevronLeft, IconChevronRight, IconX, IconBrandYoutube, IconExternalLink, IconPlus } from "@tabler/icons-react"
 import { Loader2 } from 'lucide-react'
 
 export default function ShadowingPage() {
@@ -34,6 +35,7 @@ export default function ShadowingPage() {
   
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [addLessonOpen, setAddLessonOpen] = useState(false)
 
   const { data, isLoading, error } = useAdminShadowingLessons({
     page,
@@ -84,6 +86,10 @@ export default function ShadowingPage() {
             View and edit shadowing content for language learners
           </p>
         </div>
+        <Button onClick={() => setAddLessonOpen(true)}>
+          <IconPlus className="h-4 w-4 mr-2" />
+          Add Lesson
+        </Button>
       </div>
 
       {/* Filters */}
@@ -174,6 +180,7 @@ export default function ShadowingPage() {
                     <TableHead>Title</TableHead>
                     <TableHead>Tags</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Order</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Links</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -212,6 +219,9 @@ export default function ShadowingPage() {
                         >
                           {lesson.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {lesson.order ?? <span className="text-muted-foreground">-</span>}
                       </TableCell>
                       <TableCell>{formatDuration(lesson.duration)}</TableCell>
                       <TableCell>
@@ -293,6 +303,12 @@ export default function ShadowingPage() {
           setSheetOpen(open)
           if (!open) setEditingLessonId(null)
         }}
+      />
+
+      {/* Add Lesson Sheet */}
+      <AddLessonSheet
+        open={addLessonOpen}
+        onOpenChange={setAddLessonOpen}
       />
     </div>
   )
