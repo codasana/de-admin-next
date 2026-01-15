@@ -18,9 +18,9 @@ export function getCookie(name: string): string | undefined {
 }
 
 export function removeCookie(name: string) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NEXT_PUBLIC_COOKIE_DOMAIN) {
     Cookies.remove(name, { 
-      domain: '.deepenglish.com'
+      domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN
     });
   } else {
     Cookies.remove(name);

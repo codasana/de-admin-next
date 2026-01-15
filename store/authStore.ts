@@ -37,12 +37,13 @@ export const useAuthStore = create<AuthState>()(
           const response = await api.post('/api/users/adminlogin', credentials);
           const { token, user } = response.data;
           setAuthToken(token);
-          const cookieOptions = {
+          const cookieOptions: { expires: number; domain?: string } = {
             expires: 7,
-            ...(process.env.NODE_ENV === 'production'
-              ? { domain: '.deepenglish.com' }
-              : {})
           };
+          // Only set domain for deepenglish.com deployments
+          if (process.env.NEXT_PUBLIC_COOKIE_DOMAIN) {
+            cookieOptions.domain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
+          }
           setCookie(COOKIE_NAME, token, cookieOptions);
           set({ 
             user, 
