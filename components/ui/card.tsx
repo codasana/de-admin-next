@@ -23,7 +23,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn("grid auto-cols-fr grid-cols-[1fr_auto] items-start gap-1.5 p-6 has-[data-slot=card-action]:grid-cols-[1fr_auto] [&>:not([data-slot=card-action])]:col-start-1", className)}
     {...props}
   />
 ))
@@ -76,4 +76,17 @@ const CardFooter = React.forwardRef<
 ))
 CardFooter.displayName = "CardFooter"
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+const CardAction = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-slot="card-action"
+    className={cn("col-start-2 row-span-2 row-start-1 self-start justify-self-end", className)}
+    {...props}
+  />
+))
+CardAction.displayName = "CardAction"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent, CardAction }
