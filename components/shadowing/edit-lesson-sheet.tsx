@@ -75,8 +75,19 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
   // Get available tags that haven't been selected yet
   const availableTags = AVAILABLE_TAGS.filter(tag => !selectedTags.includes(tag))
 
+  // Check if video content is empty (needed for validation)
+  const hasVideoContent = lesson?.videoContent && 
+    lesson.videoContent.content && 
+    Array.isArray(lesson.videoContent.content) && 
+    lesson.videoContent.content.length > 0
+
   const handleSave = async () => {
     if (!lessonId) return
+
+    // Prevent publishing if no video content
+    if (formData.status === 'published' && !hasVideoContent) {
+      return // Should not happen due to UI restriction, but safety check
+    }
 
     const updateData: UpdateShadowingLessonPayload = {
       ...formData,
@@ -185,9 +196,16 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="queue">Queue</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="published" disabled={!hasVideoContent}>
+                        Published {!hasVideoContent && '(needs content)'}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
+                  {!hasVideoContent && formData.status !== 'published' && (
+                    <p className="text-xs text-muted-foreground">
+                      Cannot publish until video content is processed
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-2">
