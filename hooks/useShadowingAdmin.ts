@@ -6,13 +6,16 @@ import type {
   ShadowingLesson,
   ShadowingLessonSummary,
   PaginationInfo,
-  UpdateShadowingLessonPayload 
+  UpdateShadowingLessonPayload,
+  QueueLessonPayload,
+  QueueLessonResponse,
+  ProcessLessonResponse
 } from '@/types/shadowing';
 
 interface FetchLessonsParams {
   page?: number;
   limit?: number;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'queue' | 'published';
   category?: 'start_here' | 'more_videos';
   search?: string;
 }
@@ -87,6 +90,51 @@ export function useUpdateShadowingLesson() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'shadowing', 'lessons'] });
       // Update the single lesson cache
       queryClient.setQueryData(['admin', 'shadowing', 'lesson', updatedLesson.id], updatedLesson);
+    },
+  });
+}
+
+// Queue a new lesson (quick create with just metadata)
+export function useQueueLesson() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: QueueLessonPayload) => {
+      const response = await api.post<QueueLessonResponse>(
+        '/api/shadowing/admin/queue-lesson',
+        data
+      );
+      
+      if (response.data.success) {
+        return response.data;
+      }
+      throw new Error('Failed to queue lesson');
+    },
+    onSuccess: () => {
+      // Invalidate the lessons list query to show the new queued lesson
+      queryClient.invalidateQueries({ queryKey: ['admin', 'shadowing', 'lessons'] });
+    },
+  });
+}
+
+// Process a queued lesson (run full transcription)
+export function useProcessLesson() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (lessonId: number) => {
+      const response = await api.post<ProcessLessonResponse>(
+        `/api/shadowing-transcription/process/${lessonId}`
+      );
+      
+      if (response.data.success) {
+        return response.data;
+      }
+      throw new Error('Failed to start processing');
+    },
+    onSuccess: () => {
+      // Invalidate to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['admin', 'shadowing', 'lessons'] });
     },
   });
 }

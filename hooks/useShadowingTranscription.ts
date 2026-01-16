@@ -140,3 +140,86 @@ export function useShadowingTranscription() {
     isFailed: job?.status === 'failed',
   };
 }
+
+/**
+ * Hook to poll a processing job by ID
+ * Used when processing a queued lesson
+ */
+export function useProcessingJob(jobId: string | null) {
+  const queryClient = useQueryClient();
+  
+  const [job, setJob] = useState<ShadowingTranscriptionJob | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Start polling when jobId is provided
+  const startPolling = useCallback((initialJob?: ShadowingTranscriptionJob) => {
+    if (initialJob) {
+      setJob(initialJob);
+    }
+    setIsPolling(true);
+    setError(null);
+  }, []);
+
+  // Stop polling
+  const stopPolling = useCallback(() => {
+    setIsPolling(false);
+  }, []);
+
+  // Reset state
+  const reset = useCallback(() => {
+    setJob(null);
+    setIsPolling(false);
+    setError(null);
+  }, []);
+
+  // Poll for job status
+  useEffect(() => {
+    if (!jobId || !isPolling) return;
+
+    // Stop polling if job is completed or failed
+    if (job?.status === 'completed' || job?.status === 'failed') {
+      setIsPolling(false);
+      
+      // Invalidate the lessons list to refresh
+      queryClient.invalidateQueries({ queryKey: ['admin', 'shadowing', 'lessons'] });
+      return;
+    }
+
+    const pollJobStatus = async () => {
+      try {
+        const response = await api.get<ShadowingTranscriptionJobResponse>(
+          `/api/shadowing-transcription/${jobId}`
+        );
+        
+        if (response.data.success) {
+          setJob(response.data.job);
+        }
+      } catch (err) {
+        const message = getErrorMessage(err);
+        setError(message);
+        setIsPolling(false);
+      }
+    };
+
+    // Initial poll
+    pollJobStatus();
+
+    // Poll every 2 seconds
+    const pollInterval = setInterval(pollJobStatus, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [jobId, isPolling, job?.status, queryClient]);
+
+  return {
+    job,
+    isPolling,
+    error,
+    startPolling,
+    stopPolling,
+    reset,
+    isProcessing: isPolling && job?.status !== 'completed' && job?.status !== 'failed',
+    isComplete: job?.status === 'completed',
+    isFailed: job?.status === 'failed',
+  };
+}

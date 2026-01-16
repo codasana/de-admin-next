@@ -20,22 +20,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useAdminShadowingLessons } from '@/hooks/useShadowingAdmin'
+import { useAdminShadowingLessons, useProcessLesson } from '@/hooks/useShadowingAdmin'
+import { useProcessingJob } from '@/hooks/useShadowingTranscription'
 import { EditLessonSheet } from '@/components/shadowing/edit-lesson-sheet'
 import { AddLessonSheet } from '@/components/shadowing/add-lesson-sheet'
 import { IconEdit, IconSearch, IconChevronLeft, IconChevronRight, IconX, IconBrandYoutube, IconExternalLink, IconPlus } from "@tabler/icons-react"
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function ShadowingPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'draft' | 'published' | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<'draft' | 'queue' | 'published' | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState<'start_here' | 'more_videos' | 'all'>('all')
   
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [addLessonOpen, setAddLessonOpen] = useState(false)
+  const [processingLessonId, setProcessingLessonId] = useState<number | null>(null)
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
+
+  const processMutation = useProcessLesson()
+  const { job: processingJob, isPolling, startPolling, reset: resetPolling, isComplete, isFailed } = useProcessingJob(activeJobId)
+
+  // Separate query for queue lessons (only in dev)
+  const { data: queueData, isLoading: queueLoading } = useAdminShadowingLessons({
+    page: 1,
+    limit: 100, // Show all queued lessons
+    status: 'queue',
+  })
 
   const { data, isLoading, error } = useAdminShadowingLessons({
     page,
@@ -65,6 +79,42 @@ export default function ShadowingPage() {
   const handleEdit = (lessonId: number) => {
     setEditingLessonId(lessonId)
     setSheetOpen(true)
+  }
+
+  const handleProcess = async (lessonId: number) => {
+    setProcessingLessonId(lessonId)
+    resetPolling()
+    try {
+      const result = await processMutation.mutateAsync(lessonId)
+      // Start polling the job
+      setActiveJobId(result.job.id)
+      startPolling()
+      toast.success('Processing started!')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to start processing')
+      setProcessingLessonId(null)
+    }
+  }
+
+  // Reset processing state when job completes or fails
+  const handleDismissProgress = () => {
+    setProcessingLessonId(null)
+    setActiveJobId(null)
+    resetPolling()
+  }
+
+  // Get status message for display
+  const getStatusMessage = (status: string | undefined) => {
+    const messages: Record<string, string> = {
+      pending: 'Starting...',
+      downloading: 'Downloading from YouTube...',
+      transcribing: 'Transcribing with Deepgram...',
+      processing: 'Processing transcript...',
+      creating_lesson: 'Creating lesson...',
+      completed: 'Complete!',
+      failed: 'Failed',
+    }
+    return messages[status || ''] || 'Processing...'
   }
 
   const formatDuration = (seconds: number | null) => {
@@ -114,7 +164,7 @@ export default function ShadowingPage() {
             <div className="flex gap-2">
               <Select
                 value={statusFilter}
-                onValueChange={(value: 'draft' | 'published' | 'all') => {
+                onValueChange={(value: 'draft' | 'queue' | 'published' | 'all') => {
                   setStatusFilter(value)
                   setPage(1)
                 }}
@@ -125,6 +175,7 @@ export default function ShadowingPage() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="queue">Queue</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
                 </SelectContent>
               </Select>
@@ -149,6 +200,136 @@ export default function ShadowingPage() {
             Clear search
           </Button>
         </div>
+      )}
+
+      {/* Queue Table - Only in Dev */}
+      {process.env.NODE_ENV === 'development' && queueData && queueData.lessons.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                Queue
+              </Badge>
+              Lessons to Process
+            </CardTitle>
+            <CardDescription>
+              {queueData.pagination.total} lesson{queueData.pagination.total !== 1 ? 's' : ''} waiting to be processed
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {queueLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">Thumbnail</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>YouTube</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {queueData.lessons.map((lesson) => (
+                    <TableRow key={lesson.id}>
+                      <TableCell>
+                        {lesson.thumbnailUrl ? (
+                          <img 
+                            src={lesson.thumbnailUrl} 
+                            alt={lesson.title}
+                            className="w-20 h-12 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-20 h-12 bg-muted rounded flex items-center justify-center">
+                            <IconBrandYoutube className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium max-w-[300px]">
+                        <div className="truncate">{lesson.title}</div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {lesson.youtubeVideoId}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={`https://www.youtube.com/watch?v=${lesson.youtubeVideoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="Open in YouTube"
+                        >
+                          <IconBrandYoutube className="h-5 w-5" />
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {processingLessonId === lesson.id && isPolling ? (
+                            // Show progress status
+                            <div className="flex items-center gap-2 text-sm">
+                              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                              <span className="text-blue-600 font-medium">
+                                {getStatusMessage(processingJob?.status)}
+                              </span>
+                            </div>
+                          ) : processingLessonId === lesson.id && isComplete ? (
+                            // Show success
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <span className="text-green-600 font-medium text-sm">Done!</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDismissProgress}
+                              >
+                                Dismiss
+                              </Button>
+                            </div>
+                          ) : processingLessonId === lesson.id && isFailed ? (
+                            // Show error
+                            <div className="flex items-center gap-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-red-600 font-medium text-sm">Failed</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDismissProgress}
+                              >
+                                Dismiss
+                              </Button>
+                            </div>
+                          ) : (
+                            // Show process button
+                            <>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleProcess(lesson.id)}
+                                disabled={processingLessonId !== null}
+                              >
+                                Process
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(lesson.id)}
+                                title="Edit lesson"
+                              >
+                                <IconEdit className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Lessons Table */}
@@ -215,7 +396,7 @@ export default function ShadowingPage() {
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={lesson.status === 'published' ? 'default' : 'secondary'}
+                          variant={lesson.status === 'published' ? 'default' : lesson.status === 'queue' ? 'outline' : 'secondary'}
                         >
                           {lesson.status}
                         </Badge>
@@ -253,6 +434,7 @@ export default function ShadowingPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(lesson.id)}
+                          title="Edit lesson"
                         >
                           <IconEdit className="h-4 w-4" />
                         </Button>

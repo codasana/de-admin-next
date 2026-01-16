@@ -25,7 +25,7 @@ import type { UpdateShadowingLessonPayload } from '@/types/shadowing'
 import { Loader2, X } from 'lucide-react'
 
 // Master list of tags
-const AVAILABLE_TAGS = ['People', 'Mind', 'Nature', 'Laughs', 'Big Ideas', 'Growth']
+const AVAILABLE_TAGS = ['People', 'Mind', 'Nature', 'Laughs', 'Big Ideas', 'Growth', 'Cooking', 'Language']
 
 interface EditLessonSheetProps {
   lessonId: number | null
@@ -175,7 +175,7 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value: 'draft' | 'published') => 
+                    onValueChange={(value: 'draft' | 'queue' | 'published') => 
                       setFormData(prev => ({ ...prev, status: value }))
                     }
                   >
@@ -184,6 +184,7 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="queue">Queue</SelectItem>
                       <SelectItem value="published">Published</SelectItem>
                     </SelectContent>
                   </Select>

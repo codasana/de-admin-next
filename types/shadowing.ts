@@ -7,7 +7,7 @@ export interface ShadowingLesson {
   videoContent: VideoContent | null;
   duration: number | null;
   thumbnailUrl: string | null;
-  status: 'draft' | 'published';
+  status: 'draft' | 'queue' | 'published';
   order: number | null;
   category: 'start_here' | 'more_videos';
   userId: number | null;
@@ -38,7 +38,7 @@ export interface ShadowingLessonSummary {
   tags: string[];
   duration: number | null;
   thumbnailUrl: string | null;
-  status: 'draft' | 'published';
+  status: 'draft' | 'queue' | 'published';
   category: 'start_here' | 'more_videos';
   order: number | null;
   createdAt: string;
@@ -71,7 +71,7 @@ export interface UpdateShadowingLessonPayload {
   videoContent?: VideoContent | null;
   duration?: number | null;
   thumbnailUrl?: string | null;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'queue' | 'published';
   order?: number | null;
   category?: 'start_here' | 'more_videos';
   metadata?: Record<string, unknown> | null;
@@ -104,7 +104,7 @@ export interface ShadowingTranscriptionJob {
   shadowingLesson?: {
     id: number;
     title: string;
-    status: 'draft' | 'published';
+    status: 'draft' | 'queue' | 'published';
     youtubeVideoId: string;
   } | null;
   audioFilePath: string | null;
@@ -145,4 +145,25 @@ export interface ShadowingTranscriptionJobsResponse {
 
 export interface CreateShadowingTranscriptionPayload {
   url: string;
+}
+
+export interface QueueLessonPayload {
+  url: string;
+}
+
+export interface QueueLessonResponse {
+  success: boolean;
+  lesson: ShadowingLesson;
+  message: string;
+}
+
+export interface ProcessLessonResponse {
+  success: boolean;
+  job: {
+    id: string;
+    videoId: string;
+    status: string;
+    lessonId: number;
+  };
+  message: string;
 }
