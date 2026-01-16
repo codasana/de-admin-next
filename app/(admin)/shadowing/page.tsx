@@ -202,8 +202,8 @@ export default function ShadowingPage() {
         </div>
       )}
 
-      {/* Queue Table - Only in Dev */}
-      {process.env.NODE_ENV === 'development' && queueData && queueData.lessons.length > 0 && (
+      {/* Queue Table */}
+      {queueData && queueData.lessons.length > 0 && (
         <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -266,61 +266,63 @@ export default function ShadowingPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {processingLessonId === lesson.id && isPolling ? (
-                            // Show progress status
-                            <div className="flex items-center gap-2 text-sm">
-                              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                              <span className="text-blue-600 font-medium">
-                                {getStatusMessage(processingJob?.status)}
-                              </span>
-                            </div>
-                          ) : processingLessonId === lesson.id && isComplete ? (
-                            // Show success
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium text-sm">Done!</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleDismissProgress}
-                              >
-                                Dismiss
-                              </Button>
-                            </div>
-                          ) : processingLessonId === lesson.id && isFailed ? (
-                            // Show error
-                            <div className="flex items-center gap-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-red-600 font-medium text-sm">Failed</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleDismissProgress}
-                              >
-                                Dismiss
-                              </Button>
-                            </div>
-                          ) : (
-                            // Show process button
+                          {process.env.NODE_ENV === 'development' && (
                             <>
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => handleProcess(lesson.id)}
-                                disabled={processingLessonId !== null}
-                              >
-                                Process
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(lesson.id)}
-                                title="Edit lesson"
-                              >
-                                <IconEdit className="h-4 w-4" />
-                              </Button>
+                              {processingLessonId === lesson.id && isPolling ? (
+                                // Show progress status
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                  <span className="text-blue-600 font-medium">
+                                    {getStatusMessage(processingJob?.status)}
+                                  </span>
+                                </div>
+                              ) : processingLessonId === lesson.id && isComplete ? (
+                                // Show success
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  <span className="text-green-600 font-medium text-sm">Done!</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleDismissProgress}
+                                  >
+                                    Dismiss
+                                  </Button>
+                                </div>
+                              ) : processingLessonId === lesson.id && isFailed ? (
+                                // Show error
+                                <div className="flex items-center gap-2">
+                                  <XCircle className="h-4 w-4 text-red-600" />
+                                  <span className="text-red-600 font-medium text-sm">Failed</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleDismissProgress}
+                                  >
+                                    Dismiss
+                                  </Button>
+                                </div>
+                              ) : (
+                                // Show process button
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleProcess(lesson.id)}
+                                  disabled={processingLessonId !== null}
+                                >
+                                  Process
+                                </Button>
+                              )}
                             </>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(lesson.id)}
+                            title="Edit lesson"
+                          >
+                            <IconEdit className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
