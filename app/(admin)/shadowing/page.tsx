@@ -214,6 +214,7 @@ export default function ShadowingPage() {
             </CardTitle>
             <CardDescription>
               {queueData.pagination.total} lesson{queueData.pagination.total !== 1 ? 's' : ''} waiting to be processed
+              (Member requests and team additions)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -227,6 +228,7 @@ export default function ShadowingPage() {
                   <TableRow>
                     <TableHead className="w-[80px]">Thumbnail</TableHead>
                     <TableHead>Title</TableHead>
+                    <TableHead className="w-[180px]">Source</TableHead>
                     <TableHead>YouTube</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -252,6 +254,25 @@ export default function ShadowingPage() {
                         <div className="text-xs text-muted-foreground font-mono">
                           {lesson.youtubeVideoId}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {lesson.videoRequests && lesson.videoRequests.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="default">Member</Badge>
+                            <div className="text-xs text-muted-foreground">
+                              {lesson.videoRequests[0].user.first && lesson.videoRequests[0].user.last
+                                ? `${lesson.videoRequests[0].user.first} ${lesson.videoRequests[0].user.last}`
+                                : lesson.videoRequests[0].user.email}
+                              <br />
+                              ID: {lesson.videoRequests[0].user.id}
+                              {lesson.videoRequests.length > 1 && (
+                                <span className="text-blue-600"> +{lesson.videoRequests.length - 1} more</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="secondary">Team</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <a
@@ -363,7 +384,7 @@ export default function ShadowingPage() {
                     <TableHead>Title</TableHead>
                     <TableHead>Tags</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Order</TableHead>
+                    <TableHead className="w-[180px]">Source</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Links</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -403,8 +424,24 @@ export default function ShadowingPage() {
                           {lesson.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        {lesson.order ?? <span className="text-muted-foreground">-</span>}
+                      <TableCell>
+                        {lesson.videoRequests && lesson.videoRequests.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="default">Member</Badge>
+                            <div className="text-xs text-muted-foreground">
+                              {lesson.videoRequests[0].user.first && lesson.videoRequests[0].user.last
+                                ? `${lesson.videoRequests[0].user.first} ${lesson.videoRequests[0].user.last}`
+                                : lesson.videoRequests[0].user.email}
+                              <br />
+                              ID: {lesson.videoRequests[0].user.id}
+                              {lesson.videoRequests.length > 1 && (
+                                <span className="text-blue-600"> +{lesson.videoRequests.length - 1} more</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="secondary">Team</Badge>
+                        )}
                       </TableCell>
                       <TableCell>{formatDuration(lesson.duration)}</TableCell>
                       <TableCell>

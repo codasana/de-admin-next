@@ -227,33 +227,18 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="order">Order</Label>
-                  <Input
-                    id="order"
-                    type="number"
-                    value={formData.order ?? ''}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      order: e.target.value ? parseInt(e.target.value) : null 
-                    }))}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="duration">Duration (seconds)</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    step="0.1"
-                    value={formData.duration ?? ''}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      duration: e.target.value ? parseFloat(e.target.value) : null 
-                    }))}
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="duration">Duration (seconds)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  step="0.1"
+                  value={formData.duration ?? ''}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    duration: e.target.value ? parseFloat(e.target.value) : null 
+                  }))}
+                />
               </div>
 
               <div className="grid gap-2">

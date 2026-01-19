@@ -10,7 +10,6 @@ export interface ShadowingLesson {
   status: 'draft' | 'queue' | 'published';
   order: number | null;
   category: 'start_here' | 'more_videos';
-  userId: number | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +40,16 @@ export interface ShadowingLessonSummary {
   status: 'draft' | 'queue' | 'published';
   category: 'start_here' | 'more_videos';
   order: number | null;
+  videoRequests?: Array<{
+    userId: number;
+    requestedAt: string;
+    user: {
+      id: number;
+      first: string | null;
+      last: string | null;
+      email: string;
+    };
+  }>;
   createdAt: string;
   updatedAt: string;
 }
