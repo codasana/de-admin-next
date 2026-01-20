@@ -100,15 +100,26 @@ export function useQueueLesson() {
   
   return useMutation({
     mutationFn: async (data: QueueLessonPayload) => {
-      const response = await api.post<QueueLessonResponse>(
-        '/api/shadowing/admin/queue-lesson',
-        data
-      );
-      
-      if (response.data.success) {
-        return response.data;
+      try {
+        const response = await api.post<QueueLessonResponse>(
+          '/api/shadowing/admin/queue-lesson',
+          data
+        );
+        
+        if (response.data.success) {
+          return response.data;
+        }
+        throw new Error('Failed to queue lesson');
+      } catch (error: unknown) {
+        // Extract error message from API response
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response?: { data?: { error?: string } } };
+          if (axiosError.response?.data?.error) {
+            throw new Error(axiosError.response.data.error);
+          }
+        }
+        throw error;
       }
-      throw new Error('Failed to queue lesson');
     },
     onSuccess: () => {
       // Invalidate the lessons list query to show the new queued lesson
