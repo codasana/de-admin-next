@@ -20,13 +20,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useAdminShadowingLessons, useProcessLesson } from '@/hooks/useShadowingAdmin'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useAdminShadowingLessons, useProcessLesson, useDeleteLesson } from '@/hooks/useShadowingAdmin'
 import { useProcessingJob } from '@/hooks/useShadowingTranscription'
 import { EditLessonSheet } from '@/components/shadowing/edit-lesson-sheet'
 import { AddLessonSheet } from '@/components/shadowing/add-lesson-sheet'
-import { IconEdit, IconSearch, IconChevronLeft, IconChevronRight, IconX, IconBrandYoutube, IconExternalLink, IconPlus } from "@tabler/icons-react"
+import { IconEdit, IconSearch, IconChevronLeft, IconChevronRight, IconX, IconBrandYoutube, IconExternalLink, IconPlus, IconTrash } from "@tabler/icons-react"
 import { Loader2, CheckCircle2, XCircle, Globe, Lock } from 'lucide-react'
 import { toast } from 'sonner'
+import type { ShadowingLessonSummary } from '@/types/shadowing'
 
 export default function ShadowingPage() {
   const [page, setPage] = useState(1)
@@ -40,8 +51,10 @@ export default function ShadowingPage() {
   const [addLessonOpen, setAddLessonOpen] = useState(false)
   const [processingLessonId, setProcessingLessonId] = useState<number | null>(null)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [deletingLesson, setDeletingLesson] = useState<ShadowingLessonSummary | null>(null)
 
   const processMutation = useProcessLesson()
+  const deleteMutation = useDeleteLesson()
   const { job: processingJob, isPolling, startPolling, reset: resetPolling, isComplete, isFailed } = useProcessingJob(activeJobId)
 
   // Separate query for queue lessons (only in dev)
@@ -101,6 +114,19 @@ export default function ShadowingPage() {
     setProcessingLessonId(null)
     setActiveJobId(null)
     resetPolling()
+  }
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!deletingLesson) return
+    
+    try {
+      await deleteMutation.mutateAsync(deletingLesson.id)
+      toast.success('Lesson deleted successfully')
+      setDeletingLesson(null)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete lesson')
+    }
   }
 
   // Get status message for display
@@ -360,6 +386,15 @@ export default function ShadowingPage() {
                           >
                             <IconEdit className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingLesson(lesson)}
+                            title="Delete lesson"
+                            className="text-muted-foreground hover:text-red-600"
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -501,14 +536,25 @@ export default function ShadowingPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(lesson.id)}
-                          title="Edit lesson"
-                        >
-                          <IconEdit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(lesson.id)}
+                            title="Edit lesson"
+                          >
+                            <IconEdit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingLesson(lesson)}
+                            title="Delete lesson"
+                            className="text-muted-foreground hover:text-red-600"
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -563,6 +609,37 @@ export default function ShadowingPage() {
         open={addLessonOpen}
         onOpenChange={setAddLessonOpen}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingLesson} onOpenChange={(open: boolean) => !open && setDeletingLesson(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lesson</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Are you sure you want to delete this lesson?</p>
+              {deletingLesson && (
+                <p className="font-medium text-foreground">&ldquo;{deletingLesson.title}&rdquo;</p>
+              )}
+              {deletingLesson?.videoRequests && deletingLesson.videoRequests.length > 0 && (
+                <p className="text-amber-600">
+                  ⚠️ This lesson was requested by {deletingLesson.videoRequests.length} user(s). They will lose access.
+                </p>
+              )}
+              <p className="text-sm">This action cannot be undone.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

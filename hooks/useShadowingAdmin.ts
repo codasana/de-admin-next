@@ -149,3 +149,35 @@ export function useProcessLesson() {
     },
   });
 }
+
+// Delete a lesson (admin)
+export function useDeleteLesson() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (lessonId: number) => {
+      try {
+        const response = await api.delete<{ success: boolean; message: string }>(
+          `/api/shadowing/admin/lesson/${lessonId}`
+        );
+        
+        if (response.data.success) {
+          return response.data;
+        }
+        throw new Error('Failed to delete lesson');
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response?: { data?: { error?: string } } };
+          if (axiosError.response?.data?.error) {
+            throw new Error(axiosError.response.data.error);
+          }
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['admin', 'shadowing', 'lessons'] });
+    },
+  });
+}
