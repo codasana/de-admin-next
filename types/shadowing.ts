@@ -10,6 +10,7 @@ export interface ShadowingLesson {
   status: 'draft' | 'queue' | 'published';
   order: number | null;
   category: 'start_here' | 'more_videos';
+  isPublic: boolean;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -40,6 +41,7 @@ export interface ShadowingLessonSummary {
   status: 'draft' | 'queue' | 'published';
   category: 'start_here' | 'more_videos';
   order: number | null;
+  isPublic: boolean;
   videoRequests?: Array<{
     userId: number;
     requestedAt: string;
@@ -83,6 +85,7 @@ export interface UpdateShadowingLessonPayload {
   status?: 'draft' | 'queue' | 'published';
   order?: number | null;
   category?: 'start_here' | 'more_videos';
+  isPublic?: boolean;
   metadata?: Record<string, unknown> | null;
 }
 

@@ -20,9 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { useAdminShadowingLesson, useUpdateShadowingLesson } from '@/hooks/useShadowingAdmin'
 import type { UpdateShadowingLessonPayload } from '@/types/shadowing'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, X, Globe, Lock } from 'lucide-react'
 
 // Master list of tags
 const AVAILABLE_TAGS = ['People', 'Mind', 'Nature', 'Laughs', 'Big Ideas', 'Growth', 'Cooking', 'Language']
@@ -55,6 +56,7 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
         status: lesson.status,
         order: lesson.order,
         category: lesson.category,
+        isPublic: lesson.isPublic,
       })
       setSelectedTags(lesson.tags || [])
       setVideoContentJson(lesson.videoContent ? JSON.stringify(lesson.videoContent, null, 2) : '')
@@ -224,6 +226,36 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
                       <SelectItem value="more_videos">More Videos</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Visibility Toggle */}
+              <div className="grid gap-2">
+                <Label>Visibility</Label>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="flex items-center gap-3">
+                    {formData.isPublic ? (
+                      <Globe className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Lock className="h-5 w-5 text-amber-600" />
+                    )}
+                    <div>
+                      <p className="font-medium text-sm">
+                        {formData.isPublic ? 'Public' : 'Private'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formData.isPublic 
+                          ? 'Visible to all users in the library' 
+                          : 'Only visible to the member who requested it'}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.isPublic ?? true}
+                    onCheckedChange={(checked) => 
+                      setFormData(prev => ({ ...prev, isPublic: checked }))
+                    }
+                  />
                 </div>
               </div>
 

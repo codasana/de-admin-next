@@ -25,7 +25,7 @@ import { useProcessingJob } from '@/hooks/useShadowingTranscription'
 import { EditLessonSheet } from '@/components/shadowing/edit-lesson-sheet'
 import { AddLessonSheet } from '@/components/shadowing/add-lesson-sheet'
 import { IconEdit, IconSearch, IconChevronLeft, IconChevronRight, IconX, IconBrandYoutube, IconExternalLink, IconPlus } from "@tabler/icons-react"
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Globe, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function ShadowingPage() {
@@ -228,6 +228,7 @@ export default function ShadowingPage() {
                   <TableRow>
                     <TableHead className="w-[80px]">Thumbnail</TableHead>
                     <TableHead>Title</TableHead>
+                    <TableHead>Visibility</TableHead>
                     <TableHead className="w-[180px]">Source</TableHead>
                     <TableHead>YouTube</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -253,6 +254,21 @@ export default function ShadowingPage() {
                         <div className="truncate">{lesson.title}</div>
                         <div className="text-xs text-muted-foreground font-mono">
                           {lesson.youtubeVideoId}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {lesson.isPublic ? (
+                            <>
+                              <Globe className="h-4 w-4 text-green-600" />
+                              <span className="text-xs text-green-600">Public</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-4 w-4 text-amber-600" />
+                              <span className="text-xs text-amber-600">Private</span>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -384,6 +400,7 @@ export default function ShadowingPage() {
                     <TableHead>Title</TableHead>
                     <TableHead>Tags</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Visibility</TableHead>
                     <TableHead className="w-[180px]">Source</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Links</TableHead>
@@ -423,6 +440,21 @@ export default function ShadowingPage() {
                         >
                           {lesson.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {lesson.isPublic ? (
+                            <>
+                              <Globe className="h-4 w-4 text-green-600" />
+                              <span className="text-xs text-green-600">Public</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-4 w-4 text-amber-600" />
+                              <span className="text-xs text-amber-600">Private</span>
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {lesson.videoRequests && lesson.videoRequests.length > 0 ? (
