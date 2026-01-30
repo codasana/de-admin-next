@@ -57,6 +57,7 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
         order: lesson.order,
         category: lesson.category,
         isPublic: lesson.isPublic,
+        accent: lesson.accent,
       })
       setSelectedTags(lesson.tags || [])
       setVideoContentJson(lesson.videoContent ? JSON.stringify(lesson.videoContent, null, 2) : '')
@@ -227,6 +228,26 @@ export function EditLessonSheet({ lessonId, open, onOpenChange }: EditLessonShee
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Accent Selector */}
+              <div className="grid gap-2">
+                <Label htmlFor="accent">Accent</Label>
+                <Select
+                  value={formData.accent || 'none'}
+                  onValueChange={(value: 'US' | 'UK' | 'none') => 
+                    setFormData(prev => ({ ...prev, accent: value === 'none' ? null : value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select accent..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    <SelectItem value="US">US (American)</SelectItem>
+                    <SelectItem value="UK">UK (British)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Visibility Toggle */}

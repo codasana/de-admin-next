@@ -11,6 +11,7 @@ export interface ShadowingLesson {
   order: number | null;
   category: 'start_here' | 'more_videos';
   isPublic: boolean;
+  accent: 'US' | 'UK' | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -42,6 +43,7 @@ export interface ShadowingLessonSummary {
   category: 'start_here' | 'more_videos';
   order: number | null;
   isPublic: boolean;
+  accent: 'US' | 'UK' | null;
   videoRequests?: Array<{
     userId: number;
     requestedAt: string;
@@ -86,6 +88,7 @@ export interface UpdateShadowingLessonPayload {
   order?: number | null;
   category?: 'start_here' | 'more_videos';
   isPublic?: boolean;
+  accent?: 'US' | 'UK' | null;
   metadata?: Record<string, unknown> | null;
 }
 

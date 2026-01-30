@@ -434,6 +434,7 @@ export default function ShadowingPage() {
                   <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Tags</TableHead>
+                    <TableHead>US/UK</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Visibility</TableHead>
                     <TableHead className="w-[180px]">Source</TableHead>
@@ -468,6 +469,15 @@ export default function ShadowingPage() {
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {lesson.accent ? (
+                          <Badge variant="outline" className={lesson.accent === 'US' ? 'border-blue-500 text-blue-600' : 'border-green-500 text-green-600'}>
+                            {lesson.accent}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge 
