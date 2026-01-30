@@ -9,6 +9,9 @@ import {
   // IconMessage,
   IconInnerShadowTop,
   IconMicrophone,
+  IconGift,
+  IconCoin,
+  IconFileDescription,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -22,6 +25,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarGroup,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar"
 import { useAuthStore } from "@/store/authStore"
 
@@ -36,21 +41,19 @@ const navMain = [
     url: "/shadowing",
     icon: IconMicrophone,
   },
-  // {
-  //   title: "Users",
-  //   url: "/dashboard/users",
-  //   icon: IconUsers,
-  // },
-  // {
-  //   title: "Lessons",
-  //   url: "/dashboard/lessons",
-  //   icon: IconBook,
-  // },
-  // {
-  //   title: "Chatbot",
-  //   url: "/dashboard/chatbot",
-  //   icon: IconMessage,
-  // },
+]
+
+const navRewards = [
+  {
+    title: "Member Rewards",
+    url: "/rewards/credits",
+    icon: IconCoin,
+  },
+  {
+    title: "Documentation",
+    url: "/rewards/documentation",
+    icon: IconFileDescription,
+  },
 ]
 
 // const navSecondary = [
@@ -89,6 +92,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
+        <SidebarGroup>
+          <SidebarGroupLabel>Referral System</SidebarGroupLabel>
+          <NavMain items={navRewards} />
+        </SidebarGroup>
         {/* <NavSecondary items={navSecondary} className="mt-auto" /> */}
       </SidebarContent>
       <SidebarFooter>
