@@ -26,7 +26,7 @@ import type { UpdateShadowingLessonPayload } from '@/types/shadowing'
 import { Loader2, X, Globe, Lock } from 'lucide-react'
 
 // Master list of tags
-const AVAILABLE_TAGS = ['People', 'Mind', 'Nature', 'Laughs', 'Big Ideas', 'Growth', 'Cooking', 'Language']
+const AVAILABLE_TAGS = ['People', 'Mind', 'Nature', 'Laughs', 'Big Ideas', 'Growth', 'Cooking', 'Language', 'Movies', 'Commercials']
 
 interface EditLessonSheetProps {
   lessonId: number | null
