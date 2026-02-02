@@ -223,11 +223,8 @@ export default function RewardsDocumentationPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Percent className="h-5 w-5" />
-            Stripe Coupons Required
+            Stripe Coupons
           </CardTitle>
-          <CardDescription>
-            These coupons must exist in Stripe Dashboard for the system to work
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>

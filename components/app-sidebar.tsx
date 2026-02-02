@@ -12,6 +12,7 @@ import {
   IconGift,
   IconCoin,
   IconFileDescription,
+  IconUsersGroup,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -56,6 +57,14 @@ const navRewards = [
   },
 ]
 
+const navUsers = [
+  {
+    title: "Duplicate Accounts",
+    url: "/users/duplicates",
+    icon: IconUsersGroup,
+  },
+]
+
 // const navSecondary = [
 //   {
 //     title: "Settings",
@@ -92,6 +101,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
+        <SidebarGroup>
+          <SidebarGroupLabel>User Management</SidebarGroupLabel>
+          <NavMain items={navUsers} />
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Referral System</SidebarGroupLabel>
           <NavMain items={navRewards} />
