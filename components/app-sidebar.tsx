@@ -9,6 +9,7 @@ import {
   // IconMessage,
   IconInnerShadowTop,
   IconMicrophone,
+  IconSpeakerphone,
   IconGift,
   IconCoin,
   IconFileDescription,
@@ -41,6 +42,11 @@ const navMain = [
     title: "Shadowing",
     url: "/shadowing",
     icon: IconMicrophone,
+  },
+  {
+    title: "Pronunciation",
+    url: "/pronunciation",
+    icon: IconSpeakerphone,
   },
 ]
 
