@@ -371,7 +371,7 @@ export default function ShadowingPage() {
                                   variant="default"
                                   size="sm"
                                   onClick={() => handleProcess(lesson.id)}
-                                  disabled={processingLessonId !== null}
+                                  disabled={isPolling}
                                 >
                                   Process
                                 </Button>

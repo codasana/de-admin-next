@@ -75,7 +75,7 @@ export function useShadowingTranscription() {
       return;
     }
 
-    // Poll every 2 seconds
+    // Poll every 30 seconds
     const pollInterval = setInterval(async () => {
       try {
         await pollJobStatus(job.id);
@@ -83,7 +83,7 @@ export function useShadowingTranscription() {
         console.error('Polling error:', error);
         setIsPolling(false);
       }
-    }, 2000);
+    }, 30000);
 
     return () => clearInterval(pollInterval);
   }, [job, isPolling, pollJobStatus, queryClient]);
@@ -205,8 +205,8 @@ export function useProcessingJob(jobId: string | null) {
     // Initial poll
     pollJobStatus();
 
-    // Poll every 2 seconds
-    const pollInterval = setInterval(pollJobStatus, 2000);
+    // Poll every 30 seconds
+    const pollInterval = setInterval(pollJobStatus, 30000);
 
     return () => clearInterval(pollInterval);
   }, [jobId, isPolling, job?.status, queryClient]);
