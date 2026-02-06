@@ -137,8 +137,6 @@ export type PartContent =
 
 // Video Part Content
 export interface VideoContent {
-  title?: string;
-  description?: string;
   vimeoVideoId: string;
 }
 
@@ -157,6 +155,8 @@ export interface RecognitionQuizOption {
   word: string;
   audioUrl: string;
   audioText: string;
+  voice?: TTSVoice; // Voice used for TTS generation
+  isCustomAudio?: boolean; // True if audio was uploaded, false if AI generated
   isCorrect: boolean;
 }
 
@@ -165,13 +165,27 @@ export interface ListenRepeatContent {
   items: ListenRepeatItem[];
 }
 
-export interface ListenRepeatItem {
-  text: string;
-  audioUrl: string;
+export interface ListenRepeatSegment {
+  line: string;      // Original line text
+  start: number;     // Start time in seconds
+  end: number;       // End time in seconds
 }
 
-// Pronunciation Quiz Content (Single Word)
+export interface ListenRepeatItem {
+  label?: string;        // Optional label/title for this item
+  text: string;          // Multi-line text with \n
+  audioUrl: string;
+  voice?: TTSVoice;
+  isCustomAudio?: boolean; // True if audio was uploaded, false if AI generated
+  segments?: ListenRepeatSegment[];  // Timestamped segments per line
+}
+
+// Pronunciation Quiz Content
+// quizType distinguishes between single word and future multi-word quizzes
+export type PronunciationQuizType = 'single_word' | 'multi_word';
+
 export interface PronunciationQuizContent {
+  quizType: PronunciationQuizType; // 'single_word' for now, 'multi_word' for future
   questions: PronunciationQuizQuestion[];
 }
 
@@ -184,6 +198,8 @@ export interface PronunciationQuizQuestion {
 export interface PronunciationReviewItem {
   word: string;
   audioUrl: string;
+  voice?: TTSVoice;
+  isCustomAudio?: boolean; // True if audio was uploaded, false if AI generated
 }
 
 // ============================================
@@ -303,9 +319,9 @@ export const PART_TYPE_CONFIGS: PartTypeConfig[] = [
   },
   {
     type: 'pronunciation_quiz',
-    label: 'Pronunciation Quiz',
+    label: 'Pronunciation Quiz (Single Word)',
     icon: '🎤',
-    description: 'Record and assess pronunciation'
+    description: 'Record and assess single word pronunciation'
   }
 ];
 

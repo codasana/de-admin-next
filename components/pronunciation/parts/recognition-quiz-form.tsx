@@ -10,7 +10,8 @@ import type {
   PartContent, 
   RecognitionQuizContent, 
   RecognitionQuizQuestion,
-  RecognitionQuizOption 
+  RecognitionQuizOption,
+  TTSVoice
 } from "@/types/pronunciation";
 
 interface RecognitionQuizFormProps {
@@ -27,8 +28,8 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
     const newQuestion: RecognitionQuizQuestion = {
       id: questions.length + 1,
       options: [
-        { word: "", audioUrl: "", audioText: "", isCorrect: true },
-        { word: "", audioUrl: "", audioText: "", isCorrect: false },
+        { word: "", audioUrl: "", audioText: "", voice: "nova", isCustomAudio: false, isCorrect: true },
+        { word: "", audioUrl: "", audioText: "", voice: "nova", isCustomAudio: false, isCorrect: false },
       ],
     };
     onChange({
@@ -51,7 +52,7 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
     qIndex: number, 
     oIndex: number, 
     field: keyof RecognitionQuizOption, 
-    value: string | boolean
+    value: string | boolean | TTSVoice | undefined
   ) => {
     const newQuestions = [...questions];
     const newOptions = [...newQuestions[qIndex].options];
@@ -83,6 +84,8 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
       word: "",
       audioUrl: "",
       audioText: "",
+      voice: "nova",
+      isCustomAudio: false,
       isCorrect: false,
     });
     onChange({
@@ -234,6 +237,21 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
                               text={option.audioText || option.word}
                               audioUrl={option.audioUrl}
                               onAudioUrlChange={(url) => handleOptionChange(qIndex, oIndex, 'audioUrl', url)}
+                              voice={option.voice || "nova"}
+                              onVoiceChange={(v) => handleOptionChange(qIndex, oIndex, 'voice', v)}
+                              isCustomAudio={option.isCustomAudio || false}
+                              onAudioChange={(url, isCustom) => {
+                                // Combined update to prevent race conditions
+                                const newQuestions = [...questions];
+                                const newOptions = [...newQuestions[qIndex].options];
+                                newOptions[oIndex] = { 
+                                  ...newOptions[oIndex], 
+                                  audioUrl: url,
+                                  isCustomAudio: isCustom
+                                };
+                                newQuestions[qIndex] = { ...newQuestions[qIndex], options: newOptions };
+                                onChange({ ...quizContent, questions: newQuestions });
+                              }}
                               folder={audioFolder}
                               filename={`q${qIndex + 1}-opt${oIndex + 1}.mp3`}
                               showTextInput={false}

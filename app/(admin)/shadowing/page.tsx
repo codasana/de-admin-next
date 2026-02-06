@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,6 +52,44 @@ export default function ShadowingPage() {
   const [processingLessonId, setProcessingLessonId] = useState<number | null>(null)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [deletingLesson, setDeletingLesson] = useState<ShadowingLessonSummary | null>(null)
+  
+  // Batch processing state
+  const [batchProcessing, setBatchProcessing] = useState(false)
+  const [batchQueue, setBatchQueue] = useState<number[]>([])
+  const [batchCurrentIndex, setBatchCurrentIndex] = useState(0)
+  const [batchResults, setBatchResults] = useState<{ id: number; success: boolean; error?: string }[]>([])
+  const [batchCountdown, setBatchCountdown] = useState(0)
+  const [failedLessonIds, setFailedLessonIds] = useState<Set<number>>(new Set())
+
+  // Load failed lessons from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('shadowing-batch-failed')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as number[]
+        setFailedLessonIds(new Set(parsed))
+      } catch {
+        // Invalid data, clear it
+        localStorage.removeItem('shadowing-batch-failed')
+      }
+    }
+  }, [])
+
+  // Save failed lessons to localStorage when they change
+  const addFailedLesson = useCallback((lessonId: number) => {
+    setFailedLessonIds(prev => {
+      const updated = new Set(prev)
+      updated.add(lessonId)
+      localStorage.setItem('shadowing-batch-failed', JSON.stringify([...updated]))
+      return updated
+    })
+  }, [])
+
+  const clearFailedLessons = useCallback(() => {
+    setFailedLessonIds(new Set())
+    localStorage.removeItem('shadowing-batch-failed')
+    toast.success('Cleared failed lessons list - they can now be retried')
+  }, [])
 
   const processMutation = useProcessLesson()
   const deleteMutation = useDeleteLesson()
@@ -114,6 +152,167 @@ export default function ShadowingPage() {
     setProcessingLessonId(null)
     setActiveJobId(null)
     resetPolling()
+  }
+
+  // Batch processing logic
+  const batchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const startBatchProcessing = useCallback((count: number) => {
+    if (!queueData || queueData.lessons.length === 0) {
+      toast.error('No lessons in queue to process')
+      return
+    }
+
+    // Get the first N lesson IDs from the queue, excluding previously failed ones
+    const availableLessons = queueData.lessons.filter(l => !failedLessonIds.has(l.id))
+    const lessonIds = availableLessons.slice(0, count).map(l => l.id)
+    
+    if (lessonIds.length === 0) {
+      toast.error('No lessons available to process (all may have failed previously - use Clear Failed to retry)')
+      return
+    }
+
+    const skippedCount = Math.min(count, queueData.lessons.length) - lessonIds.length
+    
+    setBatchProcessing(true)
+    setBatchQueue(lessonIds)
+    setBatchCurrentIndex(0)
+    setBatchResults([])
+    setBatchCountdown(0)
+
+    // Start processing the first lesson
+    processNextInBatch(lessonIds[0])
+    
+    if (skippedCount > 0) {
+      toast.success(`Starting batch processing of ${lessonIds.length} lessons (${skippedCount} skipped due to previous failures)`)
+    } else {
+      toast.success(`Starting batch processing of ${lessonIds.length} lessons`)
+    }
+  }, [queueData, failedLessonIds])
+
+  const processNextInBatch = async (lessonId: number) => {
+    setProcessingLessonId(lessonId)
+    resetPolling()
+    try {
+      const result = await processMutation.mutateAsync(lessonId)
+      setActiveJobId(result.job.id)
+      startPolling()
+    } catch (error) {
+      // Record failure and persist to localStorage
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      setBatchResults(prev => [...prev, { 
+        id: lessonId, 
+        success: false, 
+        error: errorMsg
+      }])
+      addFailedLesson(lessonId)
+      // Move to next lesson after a short delay
+      scheduleNextBatchItem()
+    }
+  }
+
+  const scheduleNextBatchItem = useCallback(() => {
+    setBatchCurrentIndex(prev => {
+      const nextIndex = prev + 1
+      if (nextIndex >= batchQueue.length) {
+        // Batch complete
+        setBatchProcessing(false)
+        toast.success(`Batch processing complete! ${batchResults.length + 1}/${batchQueue.length} processed`)
+        return prev
+      }
+
+      // Start 2-minute countdown
+      setBatchCountdown(120)
+      
+      // Clear any existing intervals
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
+      
+      // Update countdown every second
+      countdownIntervalRef.current = setInterval(() => {
+        setBatchCountdown(c => {
+          if (c <= 1) {
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current)
+            }
+            return 0
+          }
+          return c - 1
+        })
+      }, 1000)
+
+      // Schedule next processing after 2 minutes
+      batchTimeoutRef.current = setTimeout(() => {
+        const nextLessonId = batchQueue[nextIndex]
+        if (nextLessonId) {
+          processNextInBatch(nextLessonId)
+        }
+      }, 2 * 60 * 1000) // 2 minutes
+
+      return nextIndex
+    })
+  }, [batchQueue, batchResults.length])
+
+  // Watch for job completion during batch processing
+  useEffect(() => {
+    if (batchProcessing && processingLessonId && (isComplete || isFailed)) {
+      // Record result
+      setBatchResults(prev => [...prev, { 
+        id: processingLessonId, 
+        success: isComplete,
+        error: isFailed ? 'Processing failed' : undefined
+      }])
+      
+      // Persist failure to localStorage
+      if (isFailed) {
+        addFailedLesson(processingLessonId)
+      }
+      
+      // Reset current job state
+      setProcessingLessonId(null)
+      setActiveJobId(null)
+      resetPolling()
+      
+      // Schedule next item
+      scheduleNextBatchItem()
+    }
+  }, [batchProcessing, processingLessonId, isComplete, isFailed, scheduleNextBatchItem, addFailedLesson])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimeoutRef.current) {
+        clearTimeout(batchTimeoutRef.current)
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
+    }
+  }, [])
+
+  const cancelBatchProcessing = () => {
+    if (batchTimeoutRef.current) {
+      clearTimeout(batchTimeoutRef.current)
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+    }
+    setBatchProcessing(false)
+    setBatchQueue([])
+    setBatchCurrentIndex(0)
+    setBatchCountdown(0)
+    setProcessingLessonId(null)
+    setActiveJobId(null)
+    resetPolling()
+    toast.info('Batch processing cancelled')
+  }
+
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   // Handle delete confirmation
@@ -232,16 +431,96 @@ export default function ShadowingPage() {
       {queueData && queueData.lessons.length > 0 && (
         <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
-                Queue
-              </Badge>
-              Lessons to Process
-            </CardTitle>
-            <CardDescription>
-              {queueData.pagination.total} lesson{queueData.pagination.total !== 1 ? 's' : ''} waiting to be processed
-              (Member requests and team additions)
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                    Queue
+                  </Badge>
+                  Lessons to Process
+                </CardTitle>
+                <CardDescription className="mt-1.5">
+                  {queueData.pagination.total} lesson{queueData.pagination.total !== 1 ? 's' : ''} waiting to be processed
+                  (Member requests and team additions)
+                </CardDescription>
+              </div>
+              
+              {/* Batch Processing Buttons - Dev Only */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="flex items-center gap-2">
+                  {batchProcessing ? (
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Processing: </span>
+                        <span className="font-medium">{batchCurrentIndex + 1}/{batchQueue.length}</span>
+                        {batchCountdown > 0 && (
+                          <span className="text-amber-600 ml-2">
+                            Next in {formatCountdown(batchCountdown)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        {batchResults.map((result, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`}
+                            title={result.success ? 'Success' : result.error}
+                          />
+                        ))}
+                        {batchQueue.slice(batchResults.length).map((_, idx) => (
+                          <div 
+                            key={`pending-${idx}`} 
+                            className={`w-2 h-2 rounded-full ${idx === 0 && processingLessonId ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'}`}
+                          />
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={cancelBatchProcessing}
+                        className="text-red-600 border-red-300 hover:bg-red-50"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {failedLessonIds.size > 0 && (
+                        <div className="flex items-center gap-2 mr-2">
+                          <span className="text-xs text-red-600">
+                            {failedLessonIds.size} failed (skipped)
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFailedLessons}
+                            className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startBatchProcessing(5)}
+                        disabled={isPolling || queueData.lessons.length === 0}
+                      >
+                        Process 5
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startBatchProcessing(10)}
+                        disabled={isPolling || queueData.lessons.length === 0}
+                      >
+                        Process 10
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {queueLoading ? (
@@ -262,7 +541,7 @@ export default function ShadowingPage() {
                 </TableHeader>
                 <TableBody>
                   {queueData.lessons.map((lesson) => (
-                    <TableRow key={lesson.id}>
+                    <TableRow key={lesson.id} className={failedLessonIds.has(lesson.id) ? 'bg-red-50 dark:bg-red-950/20' : ''}>
                       <TableCell>
                         {lesson.thumbnailUrl ? (
                           <img 
@@ -277,7 +556,14 @@ export default function ShadowingPage() {
                         )}
                       </TableCell>
                       <TableCell className="font-medium max-w-[300px]">
-                        <div className="truncate">{lesson.title}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="truncate">{lesson.title}</span>
+                          {failedLessonIds.has(lesson.id) && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                              Failed
+                            </Badge>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground font-mono">
                           {lesson.youtubeVideoId}
                         </div>
@@ -371,7 +657,7 @@ export default function ShadowingPage() {
                                   variant="default"
                                   size="sm"
                                   onClick={() => handleProcess(lesson.id)}
-                                  disabled={isPolling}
+                                  disabled={isPolling || batchProcessing}
                                 >
                                   Process
                                 </Button>

@@ -190,7 +190,7 @@ export default function LessonDetailPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium">
-                          {part.title || `Part ${index + 1}`}
+                          {`Part ${index + 1}`} {part.title && `- ${part.title}`}
                         </h3>
                         <Badge variant="outline" className="shrink-0">
                           {getPartTypeLabel(part.partType)}

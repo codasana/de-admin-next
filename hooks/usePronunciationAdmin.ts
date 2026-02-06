@@ -392,11 +392,14 @@ export function useUploadImage() {
 // Upload audio
 export function useUploadAudio() {
   return useMutation({
-    mutationFn: async ({ file, folder }: { file: File; folder?: string }) => {
+    mutationFn: async ({ file, folder, filename }: { file: File; folder?: string; filename?: string }) => {
       const formData = new FormData();
       formData.append('audio', file);
       if (folder) {
         formData.append('folder', folder);
+      }
+      if (filename) {
+        formData.append('filename', filename);
       }
 
       const response = await api.post<UploadResponse>('/api/pronunciation/admin/upload-audio', formData, {
@@ -435,6 +438,32 @@ export function useSaveAudio() {
         return response.data;
       }
       throw new Error('Failed to save audio');
+    },
+  });
+}
+
+// Transcribe audio and align with text lines
+interface TranscribeAudioPayload {
+  audioUrl: string;
+  text: string;
+}
+
+interface TranscribeAudioResponse {
+  success: boolean;
+  segments: { line: string; start: number; end: number }[];
+  transcript: string;
+  wordCount: number;
+  duration: number;
+}
+
+export function useTranscribeAudio() {
+  return useMutation({
+    mutationFn: async (data: TranscribeAudioPayload) => {
+      const response = await api.post<TranscribeAudioResponse>('/api/pronunciation/admin/transcribe-audio', data);
+      if (response.data.success) {
+        return response.data;
+      }
+      throw new Error('Failed to transcribe audio');
     },
   });
 }

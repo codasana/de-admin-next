@@ -143,8 +143,8 @@ export function SectionFormSheet({ open, onOpenChange, section }: SectionFormShe
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-lg mx-4">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-lg flex flex-col p-0">
+          <SheetHeader className="px-6 pt-6">
             <SheetTitle>{isEditing ? "Edit Section" : "Create Section"}</SheetTitle>
             <SheetDescription>
               {isEditing
@@ -153,95 +153,99 @@ export function SectionFormSheet({ open, onOpenChange, section }: SectionFormShe
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6 mt-6 mx-4">
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                value={formData.title || ""}
-                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="e.g., Week 1, Week 2, etc."
-                required
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description || ""}
-                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="Optional description for this section..."
-                rows={3}
-              />
-            </div>
-
-            {/* Image */}
-            <div className="space-y-2">
-              <Label>Section Image</Label>
-              {formData.imageUrl ? (
-                <div className="relative">
-                  <img
-                    src={`https://dedownloads.s3.amazonaws.com/${formData.imageUrl}`}
-                    alt="Section"
-                    className="w-full h-32 object-cover rounded-lg border"
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8"
-                    onClick={() => setFormData((prev) => ({ ...prev, imageUrl: "" }))}
-                  >
-                    <IconX className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    id="image-upload"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                    disabled={uploadImage.isPending}
-                  />
-                  <label
-                    htmlFor="image-upload"
-                    className="cursor-pointer flex flex-col items-center gap-2"
-                  >
-                    <IconUpload className="h-8 w-8 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      {uploadImage.isPending ? "Uploading..." : "Click to upload image"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Max 2MB, jpg/png/webp
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            {/* Published Toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="published">Published</Label>
-                <p className="text-sm text-muted-foreground">
-                  Make this section visible to users
-                </p>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-y-auto px-6 space-y-6 mt-6 pb-6">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={formData.title || ""}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g., Week 1, Week 2, etc."
+                  required
+                />
               </div>
-              <Switch
-                id="published"
-                checked={formData.isPublished || false}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({ ...prev, isPublished: checked }))
-                }
-              />
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description || ""}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Optional description for this section..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Image */}
+              <div className="space-y-2">
+                <Label>Section Image</Label>
+                {formData.imageUrl ? (
+                  <div className="relative">
+                    <img
+                      src={`https://dedownloads.s3.amazonaws.com/${formData.imageUrl}`}
+                      alt="Section"
+                      className="w-full h-32 object-cover rounded-lg border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      onClick={() => setFormData((prev) => ({ ...prev, imageUrl: "" }))}
+                    >
+                      <IconX className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                    <input
+                      type="file"
+                      id="image-upload"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      disabled={uploadImage.isPending}
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className="cursor-pointer flex flex-col items-center gap-2"
+                    >
+                      <IconUpload className="h-8 w-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploadImage.isPending ? "Uploading..." : "Click to upload image"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Max 2MB, jpg/png/webp
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Published Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="published">Published</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Make this section visible to users
+                  </p>
+                </div>
+                <Switch
+                  id="published"
+                  checked={formData.isPublished || false}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, isPublished: checked }))
+                  }
+                />
+              </div>
             </div>
 
-            <SheetFooter className="gap-2">
+            {/* Sticky Footer */}
+            <SheetFooter className="border-t px-6 py-4 bg-background flex-row gap-2">
               {isEditing && (
                 <Button
                   type="button"

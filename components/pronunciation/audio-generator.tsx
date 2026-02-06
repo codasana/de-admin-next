@@ -30,6 +30,12 @@ interface AudioGeneratorProps {
   onTextChange?: (text: string) => void;
   audioUrl: string;
   onAudioUrlChange: (url: string) => void;
+  voice?: TTSVoice;
+  onVoiceChange?: (voice: TTSVoice) => void;
+  isCustomAudio?: boolean;
+  onIsCustomAudioChange?: (isCustom: boolean) => void;
+  // Combined callback for atomic updates (prevents race conditions)
+  onAudioChange?: (url: string, isCustom: boolean) => void;
   folder: string;
   filename?: string;
   showTextInput?: boolean;
@@ -42,21 +48,56 @@ export function AudioGenerator({
   onTextChange,
   audioUrl,
   onAudioUrlChange,
+  voice: voiceProp,
+  onVoiceChange,
+  isCustomAudio: isCustomAudioProp,
+  onIsCustomAudioChange,
+  onAudioChange,
   folder,
   filename,
   showTextInput = true,
   textLabel = "Text",
   textPlaceholder = "Enter text to generate audio...",
 }: AudioGeneratorProps) {
-  const [voice, setVoice] = useState<TTSVoice>("nova");
+  // Use controlled voice if provided, otherwise use local state
+  const [localVoice, setLocalVoice] = useState<TTSVoice>("nova");
+  const voice = voiceProp ?? localVoice;
+  const setVoice = (v: TTSVoice) => {
+    if (onVoiceChange) {
+      onVoiceChange(v);
+    } else {
+      setLocalVoice(v);
+    }
+  };
+
+  // Use controlled isCustomAudio if provided, otherwise use local state
+  const [localIsCustomUpload, setLocalIsCustomUpload] = useState(false);
+  const isCustomUpload = isCustomAudioProp ?? localIsCustomUpload;
+  const setIsCustomUpload = (value: boolean) => {
+    if (onIsCustomAudioChange) {
+      onIsCustomAudioChange(value);
+    } else {
+      setLocalIsCustomUpload(value);
+    }
+  };
+
   const [previewAudio, setPreviewAudio] = useState<string | null>(null);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const generateAudio = useGenerateAudio();
   const saveAudio = useSaveAudio();
   const uploadAudio = useUploadAudio();
+
+  // Generate a unique suffix for filenames to prevent collisions
+  const generateUniqueFilename = (baseFilename: string): string => {
+    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const ext = baseFilename.endsWith('.mp3') ? '' : '.mp3';
+    const nameWithoutExt = baseFilename.replace(/\.mp3$/i, '');
+    return `${nameWithoutExt}-${uniqueSuffix}${ext || '.mp3'}`;
+  };
 
   const handleGenerate = async () => {
     if (!text.trim()) {
@@ -82,18 +123,32 @@ export function AudioGenerator({
     }
 
     try {
+      const baseFilename = filename || `${text.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}.mp3`;
+      const uniqueFilename = generateUniqueFilename(baseFilename);
+      
       const result = await saveAudio.mutateAsync({
         audioBase64: previewBase64,
         folder,
-        filename: filename || `${text.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}.mp3`,
+        filename: uniqueFilename,
       });
-      onAudioUrlChange(result.url);
+      
+      // Use combined callback if available (prevents race conditions)
+      if (onAudioChange) {
+        onAudioChange(result.url, false);
+      } else {
+        onAudioUrlChange(result.url);
+        setIsCustomUpload(false);
+      }
       setPreviewAudio(null);
       setPreviewBase64(null);
       toast.success("Audio saved!");
     } catch (error) {
       toast.error("Failed to save audio");
     }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,11 +166,32 @@ export function AudioGenerator({
     }
 
     try {
-      const result = await uploadAudio.mutateAsync({ file, folder });
-      onAudioUrlChange(result.url);
+      // Generate unique filename based on the prop filename or a default
+      const baseFilename = filename || 'upload.mp3';
+      const uniqueFilename = generateUniqueFilename(baseFilename);
+      
+      const result = await uploadAudio.mutateAsync({ file, folder, filename: uniqueFilename });
+      
+      // Use combined callback if available (prevents race conditions)
+      if (onAudioChange) {
+        onAudioChange(result.url, true);
+      } else {
+        // Fallback to separate callbacks
+        onAudioUrlChange(result.url);
+        if (onIsCustomAudioChange) {
+          onIsCustomAudioChange(true);
+        } else {
+          setLocalIsCustomUpload(true);
+        }
+      }
       toast.success("Audio uploaded!");
     } catch (error) {
       toast.error("Failed to upload audio");
+    } finally {
+      // Reset file input to allow re-selecting the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -136,7 +212,13 @@ export function AudioGenerator({
   };
 
   const handleClearAudio = () => {
-    onAudioUrlChange("");
+    // Use combined callback if available (prevents race conditions)
+    if (onAudioChange) {
+      onAudioChange("", false);
+    } else {
+      onAudioUrlChange("");
+      setIsCustomUpload(false);
+    }
     setPreviewAudio(null);
     setPreviewBase64(null);
   };
@@ -168,41 +250,47 @@ export function AudioGenerator({
 
       {/* Voice Selection & Actions */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={voice} onValueChange={(v) => setVoice(v as TTSVoice)}>
-          <SelectTrigger className="w-32 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TTS_VOICES.map((v) => (
-              <SelectItem key={v.value} value={v.value}>
-                {v.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Hide AI generation controls when custom audio is uploaded */}
+        {!isCustomUpload && (
+          <>
+            <Select value={voice} onValueChange={(v) => setVoice(v as TTSVoice)}>
+              <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TTS_VOICES.map((v) => (
+                  <SelectItem key={v.value} value={v.value}>
+                    {v.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleGenerate}
-          disabled={isPending || !text.trim()}
-          className="h-8"
-        >
-          {generateAudio.isPending ? (
-            <IconRefresh className="h-3 w-3 mr-1 animate-spin" />
-          ) : (
-            <IconWand className="h-3 w-3 mr-1" />
-          )}
-          Generate
-        </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenerate}
+              disabled={isPending || !text.trim()}
+              className="h-8"
+            >
+              {generateAudio.isPending ? (
+                <IconRefresh className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <IconWand className="h-3 w-3 mr-1" />
+              )}
+              Generate
+            </Button>
+          </>
+        )}
 
-        <div className="relative">
+        <div>
           <input
+            ref={fileInputRef}
             type="file"
-            accept="audio/mpeg,audio/mp3"
+            accept="audio/mpeg,audio/mp3,.mp3"
             onChange={handleUpload}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            className="hidden"
             disabled={isPending}
           />
           <Button
@@ -211,8 +299,13 @@ export function AudioGenerator({
             size="sm"
             disabled={isPending}
             className="h-8"
+            onClick={handleUploadClick}
           >
-            <IconUpload className="h-3 w-3 mr-1" />
+            {uploadAudio.isPending ? (
+              <IconRefresh className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <IconUpload className="h-3 w-3 mr-1" />
+            )}
             Upload
           </Button>
         </div>
@@ -238,6 +331,11 @@ export function AudioGenerator({
           <div className="flex-1 text-xs">
             {previewAudio ? (
               <span className="text-amber-600">Preview (not saved)</span>
+            ) : isCustomUpload ? (
+              <span className="text-blue-600 flex items-center">
+                <IconCheck className="h-3 w-3 mr-1" />
+                Custom Upload
+              </span>
             ) : (
               <span className="text-green-600 flex items-center">
                 <IconCheck className="h-3 w-3 mr-1" />

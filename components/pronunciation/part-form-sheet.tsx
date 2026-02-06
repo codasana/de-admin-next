@@ -47,11 +47,17 @@ interface PartFormSheetProps {
   lessonId: string | null;
 }
 
+// Generate a unique ID for audio file paths (for new parts before they're saved)
+function generateTempId(): string {
+  return `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
 export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSheetProps) {
   const isEditing = part !== null;
 
   const [step, setStep] = useState<'select-type' | 'edit-content'>('select-type');
   const [partType, setPartType] = useState<PronunciationPartType | null>(null);
+  const [tempPartId, setTempPartId] = useState<string>(''); // Temporary ID for new parts' audio folders
   const [formData, setFormData] = useState<{
     title: string;
     description: string;
@@ -73,6 +79,8 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
   useEffect(() => {
     if (open) {
       if (part) {
+        // Editing existing part - use its actual ID
+        setTempPartId('');
         setPartType(part.partType);
         setFormData({
           title: part.title || "",
@@ -82,6 +90,8 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
         });
         setStep('edit-content');
       } else {
+        // Creating new part - generate a unique temp ID for audio folders
+        setTempPartId(generateTempId());
         setPartType(null);
         setFormData({
           title: "",
@@ -109,7 +119,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
         initialContent = { items: [] };
         break;
       case 'pronunciation_quiz':
-        initialContent = { questions: [] };
+        initialContent = { quizType: 'single_word', questions: [] };
         break;
     }
     setFormData(prev => ({ ...prev, content: initialContent }));
@@ -187,7 +197,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           <RecognitionQuizForm
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            partId={part?.id}
+            partId={part?.id || tempPartId}
           />
         );
       case 'listen_repeat':
@@ -195,7 +205,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           <ListenRepeatForm
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            partId={part?.id}
+            partId={part?.id || tempPartId}
           />
         );
       case 'pronunciation_quiz':
@@ -203,7 +213,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           <PronunciationQuizForm
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            partId={part?.id}
+            partId={part?.id || tempPartId}
           />
         );
       default:
@@ -214,8 +224,8 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-2xl flex flex-col p-0">
+          <SheetHeader className="px-6 pt-6">
             <SheetTitle>
               {step === 'select-type' 
                 ? "Select Part Type" 
@@ -232,98 +242,104 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
             </SheetDescription>
           </SheetHeader>
 
-          {step === 'select-type' ? (
-            <div className="grid grid-cols-2 gap-4 mt-6 mx-4">
-              {PART_TYPE_CONFIGS.map((config) => (
-                <button
-                  key={config.type}
-                  onClick={() => handleSelectType(config.type)}
-                  className="p-6 border rounded-lg hover:border-primary hover:bg-muted/50 transition-colors text-left"
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto px-6">
+            {step === 'select-type' ? (
+              <div className="grid grid-cols-2 gap-4 mt-6 pb-6">
+                {PART_TYPE_CONFIGS.map((config) => (
+                  <button
+                    key={config.type}
+                    onClick={() => handleSelectType(config.type)}
+                    className="p-6 border rounded-lg hover:border-primary hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <div className="text-3xl mb-2">{config.icon}</div>
+                    <h3 className="font-medium">{config.label}</h3>
+                    <p className="text-sm text-muted-foreground">{config.description}</p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6 mt-6 pb-6">
+                {/* Part Type Badge */}
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                  <span className="text-2xl">
+                    {PART_TYPE_CONFIGS.find(c => c.type === partType)?.icon}
+                  </span>
+                  <div>
+                    <div className="font-medium">
+                      {PART_TYPE_CONFIGS.find(c => c.type === partType)?.label}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {PART_TYPE_CONFIGS.find(c => c.type === partType)?.description}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Title (optional) */}
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title (optional)</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Custom title for this part..."
+                  />
+                </div>
+
+                {/* Part-specific content */}
+                {renderPartTypeContent()}
+
+                {/* Published Toggle */}
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div>
+                    <Label htmlFor="published">Published</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Make this part visible to users
+                    </p>
+                  </div>
+                  <Switch
+                    id="published"
+                    checked={formData.isPublished}
+                    onCheckedChange={(checked) =>
+                      setFormData(prev => ({ ...prev, isPublished: checked }))
+                    }
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Footer - always visible */}
+          {step === 'edit-content' && (
+            <SheetFooter className="border-t px-6 py-4 bg-background flex-row gap-2">
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isPending}
                 >
-                  <div className="text-3xl mb-2">{config.icon}</div>
-                  <h3 className="font-medium">{config.label}</h3>
-                  <p className="text-sm text-muted-foreground">{config.description}</p>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-6 mt-6 mx-4">
-              {/* Part Type Badge */}
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                <span className="text-2xl">
-                  {PART_TYPE_CONFIGS.find(c => c.type === partType)?.icon}
-                </span>
-                <div>
-                  <div className="font-medium">
-                    {PART_TYPE_CONFIGS.find(c => c.type === partType)?.label}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {PART_TYPE_CONFIGS.find(c => c.type === partType)?.description}
-                  </div>
-                </div>
-              </div>
-
-              {/* Title (optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="title">Title (optional)</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Custom title for this part..."
-                />
-              </div>
-
-              {/* Part-specific content */}
-              {renderPartTypeContent()}
-
-              {/* Published Toggle */}
-              <div className="flex items-center justify-between border-t pt-4">
-                <div>
-                  <Label htmlFor="published">Published</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Make this part visible to users
-                  </p>
-                </div>
-                <Switch
-                  id="published"
-                  checked={formData.isPublished}
-                  onCheckedChange={(checked) =>
-                    setFormData(prev => ({ ...prev, isPublished: checked }))
-                  }
-                />
-              </div>
-
-              <SheetFooter className="gap-2">
-                {isEditing && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setDeleteDialogOpen(true)}
-                    disabled={isPending}
-                  >
-                    <IconTrash className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                )}
-                <div className="flex-1" />
-                {!isEditing && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setStep('select-type')}
-                  >
-                    Back
-                  </Button>
-                )}
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancel
+                  <IconTrash className="h-4 w-4 mr-2" />
+                  Delete
                 </Button>
-                <Button onClick={handleSubmit} disabled={isPending}>
-                  {isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+              )}
+              <div className="flex-1" />
+              {!isEditing && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setStep('select-type')}
+                >
+                  Back
                 </Button>
-              </SheetFooter>
-            </div>
+              )}
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={isPending}>
+                {isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+              </Button>
+            </SheetFooter>
           )}
         </SheetContent>
       </Sheet>
