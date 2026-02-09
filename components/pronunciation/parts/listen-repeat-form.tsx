@@ -1,14 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconClock, IconRefresh } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconClock, IconRefresh, IconChevronRight } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { AudioGenerator } from "../audio-generator";
 import { useTranscribeAudio } from "@/hooks/usePronunciationAdmin";
 import type { PartContent, ListenRepeatContent, ListenRepeatItem, ListenRepeatSegment, TTSVoice } from "@/types/pronunciation";
+
+interface RawWord {
+  word: string;
+  start: number;
+  end: number;
+}
 
 interface ListenRepeatFormProps {
   content: PartContent;
@@ -21,6 +28,10 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
   const items = listenRepeatContent.items || [];
   
   const transcribeAudio = useTranscribeAudio();
+  
+  // Store raw word timestamps temporarily (per item index)
+  const [rawWordsMap, setRawWordsMap] = useState<Record<number, RawWord[]>>({});
+  const [showRawWordsMap, setShowRawWordsMap] = useState<Record<number, boolean>>({});
 
   const handleAddItem = () => {
     onChange({
@@ -87,6 +98,12 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
         text: item.text,
       });
 
+      // Store raw words temporarily (not saved to DB)
+      if (result.rawWords && result.rawWords.length > 0) {
+        setRawWordsMap(prev => ({ ...prev, [index]: result.rawWords! }));
+        setShowRawWordsMap(prev => ({ ...prev, [index]: true }));
+      }
+
       // Update the item with segments
       const newItems = [...items];
       newItems[index] = { 
@@ -102,6 +119,25 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
     } catch (error) {
       toast.error("Failed to get timestamps");
     }
+  };
+
+  const handleSegmentChange = (itemIndex: number, segmentIndex: number, field: 'start' | 'end', value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue) || numValue < 0) return;
+    
+    const newItems = [...items];
+    const newSegments = [...(newItems[itemIndex].segments || [])];
+    newSegments[segmentIndex] = { ...newSegments[segmentIndex], [field]: numValue };
+    newItems[itemIndex] = { ...newItems[itemIndex], segments: newSegments };
+    
+    onChange({
+      ...listenRepeatContent,
+      items: newItems,
+    });
+  };
+
+  const toggleRawWords = (index: number) => {
+    setShowRawWordsMap(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
   const formatTime = (seconds: number) => {
@@ -248,20 +284,69 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
                   </div>
                 )}
 
-                {/* Show Segments with timestamps */}
+                {/* Show Raw Word Timestamps (temporary, for review) */}
+                {/*rawWordsMap[index] && rawWordsMap[index].length > 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                      onClick={() => toggleRawWords(index)}
+                    >
+                      <IconChevronRight className={`h-4 w-4 transition-transform ${showRawWordsMap[index] ? 'rotate-90' : ''}`} />
+                      <Label className="text-xs text-orange-600 cursor-pointer">
+                        Raw Word Timestamps ({rawWordsMap[index].length} words) - For Review Only
+                      </Label>
+                    </div>
+                    {showRawWordsMap[index] && (
+                      <div className="bg-orange-50 rounded-lg p-3 max-h-48 overflow-y-auto">
+                        <div className="flex flex-wrap gap-1">
+                          {rawWordsMap[index].map((word, wIndex) => (
+                            <span 
+                              key={wIndex}
+                              className="text-xs bg-white px-2 py-1 rounded border inline-flex items-center gap-1"
+                              title={`${formatTime(word.start)} - ${formatTime(word.end)}`}
+                            >
+                              <span className="font-medium">{word.word}</span>
+                              <span className="text-muted-foreground font-mono text-[10px]">
+                                {word.start.toFixed(2)}s
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )*/}
+
+                {/* Show Segments with editable timestamps */}
                 {item.segments && item.segments.length > 0 && (
                   <div className="space-y-2 pt-2 border-t">
-                    <Label className="text-xs text-green-600">Timestamped Segments</Label>
-                    <div className="space-y-1 bg-muted/30 rounded-lg p-3">
+                    <Label className="text-xs text-green-600">Timestamped Segments (editable)</Label>
+                    <div className="space-y-2 bg-muted/30 rounded-lg p-3">
                       {item.segments.map((segment, sIndex) => (
                         <div 
                           key={sIndex} 
-                          className="flex items-center gap-3 text-sm py-1 border-b last:border-0"
+                          className="flex items-center gap-2 text-sm py-1 border-b last:border-0"
                         >
-                          <span className="text-xs text-muted-foreground font-mono w-36 shrink-0">
-                            {formatTime(segment.start)} - {formatTime(segment.end)}
-                          </span>
-                          <span className="flex-1">{segment.line}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={segment.start}
+                              onChange={(e) => handleSegmentChange(index, sIndex, 'start', e.target.value)}
+                              className="w-20 h-7 text-xs font-mono"
+                            />
+                            <span className="text-muted-foreground">-</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={segment.end}
+                              onChange={(e) => handleSegmentChange(index, sIndex, 'end', e.target.value)}
+                              className="w-20 h-7 text-xs font-mono"
+                            />
+                          </div>
+                          <span className="flex-1 text-sm">{segment.line}</span>
                         </div>
                       ))}
                     </div>

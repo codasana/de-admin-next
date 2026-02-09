@@ -454,6 +454,7 @@ interface TranscribeAudioResponse {
   transcript: string;
   wordCount: number;
   duration: number;
+  rawWords?: { word: string; start: number; end: number }[];
 }
 
 export function useTranscribeAudio() {
