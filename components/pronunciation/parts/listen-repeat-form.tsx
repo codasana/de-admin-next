@@ -5,17 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconClock, IconRefresh, IconChevronRight } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { AudioGenerator } from "../audio-generator";
 import { useTranscribeAudio } from "@/hooks/usePronunciationAdmin";
-import type { PartContent, ListenRepeatContent, ListenRepeatItem, ListenRepeatSegment, TTSVoice } from "@/types/pronunciation";
-
-interface RawWord {
-  word: string;
-  start: number;
-  end: number;
-}
+import type { PartContent, ListenRepeatContent, ListenRepeatItem, ListenRepeatSegment, RawWordTimestamp, TTSVoice } from "@/types/pronunciation";
 
 interface ListenRepeatFormProps {
   content: PartContent;
@@ -29,8 +24,7 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
   
   const transcribeAudio = useTranscribeAudio();
   
-  // Store raw word timestamps temporarily (per item index)
-  const [rawWordsMap, setRawWordsMap] = useState<Record<number, RawWord[]>>({});
+  // Track which raw words sections are expanded (UI state only)
   const [showRawWordsMap, setShowRawWordsMap] = useState<Record<number, boolean>>({});
 
   const handleAddItem = () => {
@@ -51,14 +45,15 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
   const handleItemChange = (
     index: number, 
     field: keyof ListenRepeatItem, 
-    value: string | TTSVoice | ListenRepeatSegment[] | boolean
+    value: string | TTSVoice | ListenRepeatSegment[] | RawWordTimestamp[] | boolean
   ) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     
-    // Clear segments when text or audio changes
+    // Clear segments and rawWords when text or audio changes
     if (field === 'text' || field === 'audioUrl') {
       newItems[index].segments = [];
+      newItems[index].rawWords = [];
     }
     
     onChange({
@@ -98,22 +93,22 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
         text: item.text,
       });
 
-      // Store raw words temporarily (not saved to DB)
-      if (result.rawWords && result.rawWords.length > 0) {
-        setRawWordsMap(prev => ({ ...prev, [index]: result.rawWords! }));
-        setShowRawWordsMap(prev => ({ ...prev, [index]: true }));
-      }
-
-      // Update the item with segments
+      // Update the item with segments and rawWords (both saved to DB)
       const newItems = [...items];
       newItems[index] = { 
         ...newItems[index], 
-        segments: result.segments 
+        segments: result.segments,
+        rawWords: result.rawWords || []
       };
       onChange({
         ...listenRepeatContent,
         items: newItems,
       });
+
+      // Expand the raw words section to show the new data
+      if (result.rawWords && result.rawWords.length > 0) {
+        setShowRawWordsMap(prev => ({ ...prev, [index]: true }));
+      }
 
       toast.success(`Got timestamps for ${result.segments.length} lines`);
     } catch (error) {
@@ -252,7 +247,8 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
                       ...newItems[index], 
                       audioUrl: url,
                       isCustomAudio: isCustom,
-                      segments: [] // Clear segments when audio changes
+                      segments: [], // Clear segments when audio changes
+                      rawWords: []  // Clear raw words when audio changes
                     };
                     onChange({ ...listenRepeatContent, items: newItems });
                   }}
@@ -284,8 +280,8 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
                   </div>
                 )}
 
-                {/* Show Raw Word Timestamps (temporary, for review) */}
-                {/*rawWordsMap[index] && rawWordsMap[index].length > 0 && (
+                {/* Show Raw Word Timestamps (saved, collapsible) */}
+                {item.rawWords && item.rawWords.length > 0 && (
                   <div className="space-y-2 pt-2 border-t">
                     <div 
                       className="flex items-center gap-2 cursor-pointer select-none"
@@ -293,13 +289,13 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
                     >
                       <IconChevronRight className={`h-4 w-4 transition-transform ${showRawWordsMap[index] ? 'rotate-90' : ''}`} />
                       <Label className="text-xs text-orange-600 cursor-pointer">
-                        Raw Word Timestamps ({rawWordsMap[index].length} words) - For Review Only
+                        Raw Word Timestamps ({item.rawWords.length} words)
                       </Label>
                     </div>
                     {showRawWordsMap[index] && (
                       <div className="bg-orange-50 rounded-lg p-3 max-h-48 overflow-y-auto">
                         <div className="flex flex-wrap gap-1">
-                          {rawWordsMap[index].map((word, wIndex) => (
+                          {item.rawWords.map((word, wIndex) => (
                             <span 
                               key={wIndex}
                               className="text-xs bg-white px-2 py-1 rounded border inline-flex items-center gap-1"
@@ -315,7 +311,7 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
                       </div>
                     )}
                   </div>
-                )*/}
+                )}
 
                 {/* Show Segments with editable timestamps */}
                 {item.segments && item.segments.length > 0 && (
@@ -352,6 +348,21 @@ export function ListenRepeatForm({ content, onChange, partId }: ListenRepeatForm
                     </div>
                   </div>
                 )}
+
+                {/* Enable Recording Toggle */}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div>
+                    <Label htmlFor={`recording-${index}`} className="text-xs">Enable Recording</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Allow users to record and compare their voice for each segment
+                    </p>
+                  </div>
+                  <Switch
+                    id={`recording-${index}`}
+                    checked={item.enableRecording || false}
+                    onCheckedChange={(checked) => handleItemChange(index, 'enableRecording', checked)}
+                  />
+                </div>
               </div>
             ))}
           </div>

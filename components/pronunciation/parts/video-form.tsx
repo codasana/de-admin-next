@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { PartContent, VideoContent } from "@/types/pronunciation";
 
 interface VideoPartFormProps {
@@ -25,6 +26,21 @@ export function VideoPartForm({ content, onChange }: VideoPartFormProps) {
 
   return (
     <div className="space-y-4">
+      {/* Text Before Video */}
+      <div className="space-y-2">
+        <Label htmlFor="textBefore">Text Before Video</Label>
+        <Textarea
+          id="textBefore"
+          value={videoContent.textBefore || ""}
+          onChange={(e) => onChange({ ...videoContent, textBefore: e.target.value })}
+          placeholder="Optional text to display before the video..."
+          rows={3}
+        />
+        <p className="text-xs text-muted-foreground">
+          This text will be displayed above the video player
+        </p>
+      </div>
+
       {/* Vimeo Video ID */}
       <div className="space-y-2">
         <Label htmlFor="vimeoId">Vimeo Video ID *</Label>
@@ -54,6 +70,21 @@ export function VideoPartForm({ content, onChange }: VideoPartFormProps) {
           </div>
         </div>
       )}
+
+      {/* Text After Video */}
+      <div className="space-y-2">
+        <Label htmlFor="textAfter">Text After Video</Label>
+        <Textarea
+          id="textAfter"
+          value={videoContent.textAfter || ""}
+          onChange={(e) => onChange({ ...videoContent, textAfter: e.target.value })}
+          placeholder="Optional text to display after the video..."
+          rows={3}
+        />
+        <p className="text-xs text-muted-foreground">
+          This text will be displayed below the video player
+        </p>
+      </div>
     </div>
   );
 }

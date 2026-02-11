@@ -19,6 +19,7 @@ export type TTSVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 export interface PronunciationSection {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   imageUrl: string | null;
   order: number;
@@ -30,6 +31,7 @@ export interface PronunciationSection {
 
 export interface CreateSectionPayload {
   title: string;
+  slug: string;
   description?: string | null;
   imageUrl?: string | null;
   isPublished?: boolean;
@@ -37,6 +39,7 @@ export interface CreateSectionPayload {
 
 export interface UpdateSectionPayload {
   title?: string;
+  slug?: string;
   description?: string | null;
   imageUrl?: string | null;
   order?: number;
@@ -51,6 +54,7 @@ export interface PronunciationLesson {
   id: string;
   sectionId: string;
   title: string;
+  slug: string;
   description: string | null;
   order: number;
   isPublished: boolean;
@@ -59,6 +63,7 @@ export interface PronunciationLesson {
   section?: {
     id: string;
     title: string;
+    slug: string;
   };
   parts?: PronunciationPart[];
 }
@@ -66,6 +71,7 @@ export interface PronunciationLesson {
 export interface CreateLessonPayload {
   sectionId: string;
   title: string;
+  slug: string;
   description?: string | null;
   isPublished?: boolean;
 }
@@ -73,6 +79,7 @@ export interface CreateLessonPayload {
 export interface UpdateLessonPayload {
   sectionId?: string;
   title?: string;
+  slug?: string;
   description?: string | null;
   order?: number;
   isPublished?: boolean;
@@ -138,6 +145,8 @@ export type PartContent =
 // Video Part Content
 export interface VideoContent {
   vimeoVideoId: string;
+  textBefore?: string;  // Text content to display before the video
+  textAfter?: string;   // Text content to display after the video
 }
 
 // Recognition Quiz Content
@@ -171,6 +180,12 @@ export interface ListenRepeatSegment {
   end: number;       // End time in seconds
 }
 
+export interface RawWordTimestamp {
+  word: string;
+  start: number;
+  end: number;
+}
+
 export interface ListenRepeatItem {
   label?: string;        // Optional label/title for this item
   text: string;          // Multi-line text with \n
@@ -178,6 +193,8 @@ export interface ListenRepeatItem {
   voice?: TTSVoice;
   isCustomAudio?: boolean; // True if audio was uploaded, false if AI generated
   segments?: ListenRepeatSegment[];  // Timestamped segments per line
+  rawWords?: RawWordTimestamp[];     // Raw word-level timestamps from Deepgram
+  enableRecording?: boolean; // Enable per-segment recording for user practice
 }
 
 // Pronunciation Quiz Content

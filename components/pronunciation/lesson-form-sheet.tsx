@@ -42,6 +42,7 @@ export function LessonFormSheet({ open, onOpenChange, lesson, sectionId }: Lesso
   const [formData, setFormData] = useState<CreateLessonPayload | UpdateLessonPayload>({
     sectionId: "",
     title: "",
+    slug: "",
     description: "",
     isPublished: false,
   });
@@ -58,6 +59,7 @@ export function LessonFormSheet({ open, onOpenChange, lesson, sectionId }: Lesso
         setFormData({
           sectionId: lesson.sectionId,
           title: lesson.title,
+          slug: lesson.slug || "",
           description: lesson.description || "",
           isPublished: lesson.isPublished,
         });
@@ -65,6 +67,7 @@ export function LessonFormSheet({ open, onOpenChange, lesson, sectionId }: Lesso
         setFormData({
           sectionId: sectionId || "",
           title: "",
+          slug: "",
           description: "",
           isPublished: false,
         });
@@ -77,6 +80,17 @@ export function LessonFormSheet({ open, onOpenChange, lesson, sectionId }: Lesso
 
     if (!formData.title?.trim()) {
       toast.error("Title is required");
+      return;
+    }
+
+    if (!formData.slug?.trim()) {
+      toast.error("Slug is required");
+      return;
+    }
+
+    // Validate slug format
+    if (!/^[a-z0-9-]+$/.test(formData.slug)) {
+      toast.error("Slug can only contain lowercase letters, numbers, and hyphens");
       return;
     }
 
@@ -143,6 +157,21 @@ export function LessonFormSheet({ open, onOpenChange, lesson, sectionId }: Lesso
                   placeholder="e.g., Lesson 1, Lesson 2, etc."
                   required
                 />
+              </div>
+
+              {/* Slug */}
+              <div className="space-y-2">
+                <Label htmlFor="slug">Slug *</Label>
+                <Input
+                  id="slug"
+                  value={formData.slug || ""}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))}
+                  placeholder="e.g., lesson-1, lesson-2, etc."
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  URL-friendly identifier. Must be unique within this section.
+                </p>
               </div>
 
               {/* Description */}
