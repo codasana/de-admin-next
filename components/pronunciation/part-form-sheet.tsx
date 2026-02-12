@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useCreatePart, useUpdatePart, useDeletePart } from "@/hooks/usePronunciationAdmin";
-import { IconTrash } from "@tabler/icons-react";
+import { IconTrash, IconCheck, IconRefresh, IconAlertCircle } from "@tabler/icons-react";
 import { PART_TYPE_CONFIGS } from "@/types/pronunciation";
 import type { 
   PronunciationPart, 
@@ -52,6 +52,8 @@ function generateTempId(): string {
   return `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
+type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
+
 export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSheetProps) {
   const isEditing = part !== null;
 
@@ -70,14 +72,79 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
     content: {},
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
   const createPart = useCreatePart();
   const updatePart = useUpdatePart();
   const deletePart = useDeletePart();
 
+  // Refs for auto-save debouncing
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialLoadRef = useRef(true);
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
+  const partRef = useRef(part);
+  partRef.current = part;
+
+  // Auto-save function for existing parts (stable ref to avoid effect re-triggers)
+  const performAutoSave = useCallback(async () => {
+    const currentPart = partRef.current;
+    if (!currentPart) return;
+    
+    setSaveStatus('saving');
+    try {
+      await updatePart.mutateAsync({
+        id: currentPart.id,
+        data: {
+          title: formDataRef.current.title || null,
+          description: formDataRef.current.description || null,
+          isPublished: formDataRef.current.isPublished,
+          content: formDataRef.current.content,
+        } as UpdatePartPayload,
+      });
+      setSaveStatus('saved');
+      // Reset to idle after a brief "saved" display
+      setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2000);
+    } catch {
+      setSaveStatus('error');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updatePart.mutateAsync]);
+
+  // Keep a stable ref to performAutoSave so the debounce effect doesn't re-trigger
+  const performAutoSaveRef = useRef(performAutoSave);
+  performAutoSaveRef.current = performAutoSave;
+
+  // Debounced auto-save: triggers 2 seconds after last change (only for existing parts)
+  useEffect(() => {
+    // Skip on initial load (when the form is first populated from the part data)
+    if (isInitialLoadRef.current) return;
+    if (!isEditing || !part) return;
+
+    setSaveStatus('unsaved');
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      performAutoSaveRef.current();
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  // Only re-run when formData actually changes (the value the user edits).
+  // performAutoSave is accessed via stable ref, so not needed in deps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, isEditing]);
+
   // Reset form when sheet opens/closes or part changes
   useEffect(() => {
     if (open) {
+      isInitialLoadRef.current = true;
+      setSaveStatus('idle');
       if (part) {
         // Editing existing part - use its actual ID
         setTempPartId('');
@@ -100,6 +167,13 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           content: {},
         });
         setStep('select-type');
+      }
+      // Allow a tick for the initial state to settle before enabling auto-save
+      setTimeout(() => { isInitialLoadRef.current = false; }, 100);
+    } else {
+      // Clean up timer when sheet closes
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
       }
     }
   }, [open, part]);
@@ -137,8 +211,14 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
       return;
     }
 
+    // Cancel any pending auto-save
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
     try {
       if (isEditing && part) {
+        setSaveStatus('saving');
         await updatePart.mutateAsync({
           id: part.id,
           data: {
@@ -148,6 +228,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
             content: formData.content,
           } as UpdatePartPayload,
         });
+        setSaveStatus('saved');
         toast.success("Part updated successfully");
       } else {
         await createPart.mutateAsync({
@@ -160,11 +241,23 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
         } as CreatePartPayload);
         toast.success("Part created successfully");
       }
-      onOpenChange(false);
     } catch (error) {
+      setSaveStatus('error');
       toast.error(isEditing ? "Failed to update part" : "Failed to create part");
     }
   };
+
+  // When closing, flush any pending auto-save immediately
+  const handleClose = useCallback((openState: boolean) => {
+    if (!openState && isEditing && saveStatus === 'unsaved') {
+      // Cancel the pending debounce and save immediately
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      performAutoSaveRef.current();
+    }
+    onOpenChange(openState);
+  }, [isEditing, saveStatus, onOpenChange]);
 
   const handleDelete = async () => {
     if (!part) return;
@@ -223,7 +316,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+      <Sheet open={open} onOpenChange={handleClose}>
         <SheetContent className="sm:max-w-2xl flex flex-col p-0">
           <SheetHeader className="px-6 pt-6">
             <SheetTitle>
@@ -311,7 +404,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
 
           {/* Sticky Footer - always visible */}
           {step === 'edit-content' && (
-            <SheetFooter className="border-t px-6 py-4 bg-background flex-row gap-2">
+            <SheetFooter className="border-t px-6 py-4 bg-background flex-row gap-2 items-center">
               {isEditing && (
                 <Button
                   type="button"
@@ -323,6 +416,37 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
                   Delete
                 </Button>
               )}
+
+              {/* Auto-save status indicator (only for existing parts) */}
+              {isEditing && (
+                <div className="flex items-center gap-1.5 text-xs px-2">
+                  {saveStatus === 'unsaved' && (
+                    <span className="text-amber-600 flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      Unsaved changes
+                    </span>
+                  )}
+                  {saveStatus === 'saving' && (
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <IconRefresh className="h-3 w-3 animate-spin" />
+                      Saving...
+                    </span>
+                  )}
+                  {saveStatus === 'saved' && (
+                    <span className="text-green-600 flex items-center gap-1">
+                      <IconCheck className="h-3 w-3" />
+                      Saved
+                    </span>
+                  )}
+                  {saveStatus === 'error' && (
+                    <span className="text-destructive flex items-center gap-1">
+                      <IconAlertCircle className="h-3 w-3" />
+                      Save failed
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex-1" />
               {!isEditing && (
                 <Button 
@@ -333,11 +457,11 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
                   Back
                 </Button>
               )}
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+              <Button type="button" variant="outline" onClick={() => handleClose(false)}>
+                {isEditing ? "Close" : "Cancel"}
               </Button>
               <Button onClick={handleSubmit} disabled={isPending}>
-                {isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+                {isPending ? "Saving..." : isEditing ? "Save Now" : "Create"}
               </Button>
             </SheetFooter>
           )}
