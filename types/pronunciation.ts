@@ -157,7 +157,7 @@ export interface RecognitionQuizContent {
 export interface RecognitionQuizQuestion {
   id: number;
   options: RecognitionQuizOption[];
-  // Note: The correct audio is the audioUrl from the option with isCorrect: true
+  // Note: The correct answer is randomly assigned on the frontend at quiz time
 }
 
 export interface RecognitionQuizOption {
@@ -166,7 +166,7 @@ export interface RecognitionQuizOption {
   audioText: string;
   voice?: TTSVoice; // Voice used for TTS generation
   isCustomAudio?: boolean; // True if audio was uploaded, false if AI generated
-  isCorrect: boolean;
+  isCorrect?: boolean; // Deprecated: correct answer is now randomly assigned on frontend
 }
 
 // Listen & Repeat Content

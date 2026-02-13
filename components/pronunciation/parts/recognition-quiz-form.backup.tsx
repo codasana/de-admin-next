@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -18,6 +19,7 @@ import {
   IconChevronUp, 
   IconChevronDown, 
   IconChevronRight,
+  IconCheck,
   IconVolume,
   IconVolumeOff,
   IconList,
@@ -86,8 +88,8 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
     const newQuestion: RecognitionQuizQuestion = {
       id: questions.length + 1,
       options: [
-        { word: "", audioUrl: "", audioText: "", voice: "echo", isCustomAudio: false },
-        { word: "", audioUrl: "", audioText: "", voice: "echo", isCustomAudio: false },
+        { word: "", audioUrl: "", audioText: "", voice: "echo", isCustomAudio: false, isCorrect: true },
+        { word: "", audioUrl: "", audioText: "", voice: "echo", isCustomAudio: false, isCorrect: false },
       ],
     };
     const newIndex = questions.length;
@@ -124,7 +126,13 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
     const newQuestions = [...questions];
     const newOptions = [...newQuestions[qIndex].options];
     
-    newOptions[oIndex] = { ...newOptions[oIndex], [field]: value };
+    if (field === 'isCorrect' && value === true) {
+      newOptions.forEach((opt, i) => {
+        opt.isCorrect = i === oIndex;
+      });
+    } else {
+      newOptions[oIndex] = { ...newOptions[oIndex], [field]: value };
+    }
     
     if (field === 'word') {
       newOptions[oIndex].audioText = value as string;
@@ -145,6 +153,7 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
       audioText: "",
       voice: "echo",
       isCustomAudio: false,
+      isCorrect: false,
     });
     onChange({
       ...quizContent,
@@ -185,11 +194,19 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
 
   // --- Bulk Add Logic ---
 
-  const parseBulkText = (text: string): { options: { word: string }[] }[] => {
+  const parseBulkText = (text: string): { options: { word: string; isCorrect: boolean }[] }[] => {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     return lines.map(line => {
       const parts = line.split(',').map(p => p.trim()).filter(p => p.length > 0);
-      const options = parts.map(p => ({ word: p }));
+      const options = parts.map(p => {
+        const isCorrect = p.startsWith('*');
+        const word = isCorrect ? p.slice(1).trim() : p;
+        return { word, isCorrect };
+      });
+      // If no option is marked correct, mark the first one
+      if (!options.some(o => o.isCorrect) && options.length > 0) {
+        options[0].isCorrect = true;
+      }
       return { options };
     });
   };
@@ -238,7 +255,7 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
       for (let oi = 0; oi < parsedQ.options.length; oi++) {
         if (bulkAbortRef.current) break;
 
-        const { word } = parsedQ.options[oi];
+        const { word, isCorrect } = parsedQ.options[oi];
         let audioUrl = "";
 
         // Generate & save audio
@@ -265,6 +282,7 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
           audioText: word,
           voice: bulkVoice,
           isCustomAudio: false,
+          isCorrect,
         });
       }
 
@@ -358,8 +376,13 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
                           {question.options.map((opt, oIdx) => (
                             <span 
                               key={oIdx}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs shrink-0 bg-muted text-muted-foreground"
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs shrink-0 ${
+                                opt.isCorrect 
+                                  ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 font-medium' 
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
                             >
+                              {opt.isCorrect && <IconCheck className="h-3 w-3" />}
                               <span className="truncate max-w-[80px]">{opt.word || '(empty)'}</span>
                               {opt.audioUrl ? (
                                 <IconVolume className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -426,53 +449,64 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
                               {question.options.map((option, oIndex) => (
                                 <div 
                                   key={oIndex} 
-                                  className="p-3 rounded-lg border bg-muted/50"
+                                  className={`p-3 rounded-lg border ${
+                                    option.isCorrect 
+                                      ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900' 
+                                      : 'bg-muted/50'
+                                  }`}
                                 >
-                                  <div className="flex-1 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-muted-foreground font-medium w-6 shrink-0">
-                                        {oIndex + 1}.
-                                      </span>
-                                      <Input
-                                        value={option.word}
-                                        onChange={(e) => handleOptionChange(qIndex, oIndex, 'word', e.target.value)}
-                                        placeholder="Word (e.g., ship)"
-                                        className="flex-1"
+                                  <div className="flex items-start gap-3">
+                                    <div className="pt-2">
+                                      <Checkbox
+                                        checked={option.isCorrect}
+                                        onCheckedChange={(checked) => 
+                                          handleOptionChange(qIndex, oIndex, 'isCorrect', !!checked)
+                                        }
                                       />
-                                      {question.options.length > 2 && (
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-destructive hover:text-destructive"
-                                          onClick={() => handleRemoveOption(qIndex, oIndex)}
-                                        >
-                                          <IconTrash className="h-4 w-4" />
-                                        </Button>
-                                      )}
                                     </div>
-                                    <AudioGenerator
-                                      text={option.audioText || option.word}
-                                      audioUrl={option.audioUrl}
-                                      onAudioUrlChange={(url) => handleOptionChange(qIndex, oIndex, 'audioUrl', url)}
-                                      voice={option.voice || "nova"}
-                                      onVoiceChange={(v) => handleOptionChange(qIndex, oIndex, 'voice', v)}
-                                      isCustomAudio={option.isCustomAudio || false}
-                                      onAudioChange={(url, isCustom) => {
-                                        const newQuestions = [...questions];
-                                        const newOptions = [...newQuestions[qIndex].options];
-                                        newOptions[oIndex] = { 
-                                          ...newOptions[oIndex], 
-                                          audioUrl: url,
-                                          isCustomAudio: isCustom
-                                        };
-                                        newQuestions[qIndex] = { ...newQuestions[qIndex], options: newOptions };
-                                        onChange({ ...quizContent, questions: newQuestions });
-                                      }}
-                                      folder={audioFolder}
-                                      filename={`q${qIndex + 1}-opt${oIndex + 1}.mp3`}
-                                      showTextInput={false}
-                                    />
+                                    <div className="flex-1 space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          value={option.word}
+                                          onChange={(e) => handleOptionChange(qIndex, oIndex, 'word', e.target.value)}
+                                          placeholder="Word (e.g., ship)"
+                                          className="flex-1"
+                                        />
+                                        {question.options.length > 2 && (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                            onClick={() => handleRemoveOption(qIndex, oIndex)}
+                                          >
+                                            <IconTrash className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                      <AudioGenerator
+                                        text={option.audioText || option.word}
+                                        audioUrl={option.audioUrl}
+                                        onAudioUrlChange={(url) => handleOptionChange(qIndex, oIndex, 'audioUrl', url)}
+                                        voice={option.voice || "nova"}
+                                        onVoiceChange={(v) => handleOptionChange(qIndex, oIndex, 'voice', v)}
+                                        isCustomAudio={option.isCustomAudio || false}
+                                        onAudioChange={(url, isCustom) => {
+                                          const newQuestions = [...questions];
+                                          const newOptions = [...newQuestions[qIndex].options];
+                                          newOptions[oIndex] = { 
+                                            ...newOptions[oIndex], 
+                                            audioUrl: url,
+                                            isCustomAudio: isCustom
+                                          };
+                                          newQuestions[qIndex] = { ...newQuestions[qIndex], options: newOptions };
+                                          onChange({ ...quizContent, questions: newQuestions });
+                                        }}
+                                        folder={audioFolder}
+                                        filename={`q${qIndex + 1}-opt${oIndex + 1}.mp3`}
+                                        showTextInput={false}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                               ))}
@@ -503,18 +537,18 @@ export function RecognitionQuizForm({ content, onChange, partId }: RecognitionQu
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  One question per line. Comma-separated options. The correct answer will be randomly assigned on the frontend.
+                  One question per line. Comma-separated options. Prefix the correct answer with <code className="bg-muted px-1 rounded font-mono">*</code>
                 </p>
                 <div className="text-xs text-muted-foreground bg-muted rounded p-2 font-mono leading-relaxed">
-                  ship, sheep<br />
-                  bit, beat<br />
-                  pool, pole
+                  *ship, sheep<br />
+                  *bit, beat<br />
+                  *pool, pole
                 </div>
 
                 <Textarea
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
-                  placeholder={"ship, sheep, shop\nbit, beat, bat\npull, pool, pole"}
+                  placeholder={"*ship, sheep, shop\n*bit, beat, bat\npull, *pool, pole"}
                   rows={6}
                   className="font-mono text-sm"
                   disabled={bulkProcessing}
