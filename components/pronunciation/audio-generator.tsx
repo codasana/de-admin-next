@@ -127,6 +127,9 @@ export function AudioGenerator({
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+      }
     };
   }, []);
 
@@ -251,35 +254,23 @@ export function AudioGenerator({
 
   // --- Recording ---
 
-  const blobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        // Strip the "data:audio/webm;base64," prefix
-        const base64 = dataUrl.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
+  const MAX_RECORDING_SECONDS = 10 * 60; // 10 minutes
 
-  // Saves recorded blob as base64 via saveAudio (avoids multer format validation)
+  // Uploads recorded blob via multipart form data (avoids base64 bloat / 413 errors)
   // Uses refs to always read the latest props (avoids stale closure from recorder.onstop)
   const handleSaveRecording = async (blob: Blob) => {
     setIsUploadingRecording(true);
     try {
-      const base64 = await blobToBase64(blob);
       const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp4') ? 'm4a' : 'wav';
       const currentFilename = filenameRef.current;
       const baseFilename = currentFilename
         ? currentFilename.replace(/\.[^.]+$/, `.${ext}`)
         : `recording.${ext}`;
       const uniqueFilename = generateUniqueFilename(baseFilename);
+      const file = new File([blob], uniqueFilename, { type: blob.type });
 
-      const result = await saveAudio.mutateAsync({
-        audioBase64: base64,
+      const result = await uploadAudio.mutateAsync({
+        file,
         folder: folderRef.current,
         filename: uniqueFilename,
       });
@@ -302,6 +293,9 @@ export function AudioGenerator({
   // Keep a stable ref so recorder.onstop always calls the latest version
   const handleSaveRecordingRef = useRef(handleSaveRecording);
   handleSaveRecordingRef.current = handleSaveRecording;
+
+  // Auto-stop ref (needs to call handleStopRecording which is defined below)
+  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleStartRecording = async () => {
     try {
@@ -341,13 +335,27 @@ export function AudioGenerator({
         }
       };
 
-      recorder.start(100);
+      recorder.start(1000); // Collect data every second (more reliable for long recordings)
       setIsRecording(true);
       setRecordingDuration(0);
 
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
+
+      // Auto-stop after max duration
+      autoStopTimerRef.current = setTimeout(() => {
+        toast.info("Maximum recording time reached (10 minutes)");
+        // Stop the recorder directly (handleStopRecording clears timers)
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        setIsRecording(false);
+      }, MAX_RECORDING_SECONDS * 1000);
     } catch (error) {
       toast.error("Could not access microphone. Please allow microphone access.");
     }
@@ -360,6 +368,10 @@ export function AudioGenerator({
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
+    }
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
     }
     setIsRecording(false);
   };
