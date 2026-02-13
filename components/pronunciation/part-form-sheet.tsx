@@ -55,7 +55,9 @@ function generateTempId(): string {
 type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSheetProps) {
-  const isEditing = part !== null;
+  // After a create succeeds, we store the new part ID so the sheet switches to "edit" mode
+  const [createdPartId, setCreatedPartId] = useState<string | null>(null);
+  const isEditing = part !== null || createdPartId !== null;
 
   const [step, setStep] = useState<'select-type' | 'edit-content'>('select-type');
   const [partType, setPartType] = useState<PronunciationPartType | null>(null);
@@ -78,65 +80,15 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
   const updatePart = useUpdatePart();
   const deletePart = useDeletePart();
 
-  // Refs for auto-save debouncing
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref to skip marking unsaved on initial form population
   const isInitialLoadRef = useRef(true);
-  const formDataRef = useRef(formData);
-  formDataRef.current = formData;
-  const partRef = useRef(part);
-  partRef.current = part;
 
-  // Auto-save function for existing parts (stable ref to avoid effect re-triggers)
-  const performAutoSave = useCallback(async () => {
-    const currentPart = partRef.current;
-    if (!currentPart) return;
-    
-    setSaveStatus('saving');
-    try {
-      await updatePart.mutateAsync({
-        id: currentPart.id,
-        data: {
-          title: formDataRef.current.title || null,
-          description: formDataRef.current.description || null,
-          isPublished: formDataRef.current.isPublished,
-          content: formDataRef.current.content,
-        } as UpdatePartPayload,
-      });
-      setSaveStatus('saved');
-      // Reset to idle after a brief "saved" display
-      setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2000);
-    } catch {
-      setSaveStatus('error');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [updatePart.mutateAsync]);
-
-  // Keep a stable ref to performAutoSave so the debounce effect doesn't re-trigger
-  const performAutoSaveRef = useRef(performAutoSave);
-  performAutoSaveRef.current = performAutoSave;
-
-  // Debounced auto-save: triggers 2 seconds after last change (only for existing parts)
+  // Track unsaved changes (only for existing parts)
   useEffect(() => {
-    // Skip on initial load (when the form is first populated from the part data)
     if (isInitialLoadRef.current) return;
-    if (!isEditing || !part) return;
+    if (!isEditing) return;
 
     setSaveStatus('unsaved');
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-    autoSaveTimerRef.current = setTimeout(() => {
-      performAutoSaveRef.current();
-    }, 2000);
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  // Only re-run when formData actually changes (the value the user edits).
-  // performAutoSave is accessed via stable ref, so not needed in deps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData, isEditing]);
 
@@ -145,6 +97,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
     if (open) {
       isInitialLoadRef.current = true;
       setSaveStatus('idle');
+      setCreatedPartId(null);
       if (part) {
         // Editing existing part - use its actual ID
         setTempPartId('');
@@ -168,13 +121,8 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
         });
         setStep('select-type');
       }
-      // Allow a tick for the initial state to settle before enabling auto-save
+      // Allow a tick for the initial state to settle before tracking unsaved changes
       setTimeout(() => { isInitialLoadRef.current = false; }, 100);
-    } else {
-      // Clean up timer when sheet closes
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
     }
   }, [open, part]);
 
@@ -211,16 +159,13 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
       return;
     }
 
-    // Cancel any pending auto-save
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
     try {
-      if (isEditing && part) {
+      const editId = part?.id || createdPartId;
+      if (editId) {
+        // Update existing part (or a part we just created in this session)
         setSaveStatus('saving');
         await updatePart.mutateAsync({
-          id: part.id,
+          id: editId,
           data: {
             title: formData.title || null,
             description: formData.description || null,
@@ -231,7 +176,8 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
         setSaveStatus('saved');
         toast.success("Part updated successfully");
       } else {
-        await createPart.mutateAsync({
+        // Create new part
+        const newPart = await createPart.mutateAsync({
           lessonId: lessonId!,
           partType,
           title: formData.title || null,
@@ -239,6 +185,9 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           isPublished: formData.isPublished,
           content: formData.content,
         } as CreatePartPayload);
+        // Switch to edit mode so further saves update instead of creating again
+        setCreatedPartId(newPart.id);
+        setSaveStatus('saved');
         toast.success("Part created successfully");
       }
     } catch (error) {
@@ -247,17 +196,9 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
     }
   };
 
-  // When closing, flush any pending auto-save immediately
   const handleClose = useCallback((openState: boolean) => {
-    if (!openState && isEditing && saveStatus === 'unsaved') {
-      // Cancel the pending debounce and save immediately
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-      performAutoSaveRef.current();
-    }
     onOpenChange(openState);
-  }, [isEditing, saveStatus, onOpenChange]);
+  }, [onOpenChange]);
 
   const handleDelete = async () => {
     if (!part) return;
@@ -290,7 +231,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           <RecognitionQuizForm
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            partId={part?.id || tempPartId}
+            partId={part?.id || createdPartId || tempPartId}
           />
         );
       case 'listen_repeat':
@@ -298,7 +239,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           <ListenRepeatForm
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            partId={part?.id || tempPartId}
+            partId={part?.id || createdPartId || tempPartId}
           />
         );
       case 'pronunciation_quiz':
@@ -306,7 +247,7 @@ export function PartFormSheet({ open, onOpenChange, part, lessonId }: PartFormSh
           <PronunciationQuizForm
             content={formData.content}
             onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-            partId={part?.id || tempPartId}
+            partId={part?.id || createdPartId || tempPartId}
           />
         );
       default:
